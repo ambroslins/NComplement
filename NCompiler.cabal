@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: f48a81ce4b8b7c34de557a11687e2197f4300556299fa0e6be72b5953ca4a134
+-- hash: af4b3bd9aa4dce22bed2fab108ec7d9bdf9e6d53244637efd6570cc792c11ee5
 
 name:           NCompiler
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       Paths_NCompiler
   hs-source-dirs:
       src
+  ghc-options: -Wall
   build-depends:
       base >=4.7 && <5
     , parsec
@@ -45,7 +46,7 @@ executable NCompiler-exe
       Paths_NCompiler
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:
       NCompiler
     , base >=4.7 && <5
