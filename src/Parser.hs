@@ -10,26 +10,31 @@ expr =
   buildExpressionParser table term
     <?> "expression"
 
-term = parens expr <|> Natural <$> natural
+term :: Parsec String u Expression
+term = parens expr <|> Lit <$> literal
+  where
+    literal =
+      (symbol "True" *> pure (LitBool True))
+        <|> (symbol "False" *> pure (LitBool False))
+        <|> LitReal <$> try float
+        <|> LitInteger <$> integer
 
 table =
   [ [prefix "-" Neg, prefix "+" id],
     [binary "*" Mul AssocLeft, binary "/" Div AssocLeft],
-    [binary "+" Add AssocLeft, binary "-" Sub AssocLeft]
+    [binary "+" Add AssocLeft, binary "-" Sub AssocLeft],
+    [binary "=" Eq AssocNone, binary "<" Lt AssocNone, binary ">" Gt AssocNone]
   ]
-
-binary name fun assoc = Infix (do reservedOp name; return fun) assoc
-
-prefix name fun = Prefix (do reservedOp name; return fun)
-
-postfix name fun = Postfix (do reservedOp name; return fun)
-
+  where
+    binary name fun assoc = Infix (do reservedOp name; return fun) assoc
+    prefix name fun = Prefix (do reservedOp name; return fun)
+    postfix name fun = Postfix (do reservedOp name; return fun)
 
 lexer =
   Token.makeTokenParser
     emptyDef
       { Token.commentLine = "--",
-        Token.opStart = oneOf "=+-*/"
+        Token.opStart = oneOf "+-*/=<>"
       }
 
 identifier = Token.identifier lexer
