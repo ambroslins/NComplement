@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 12b6b66ab16477d6bbe5994041d9296a28a117e3af7f1099cd7ab58958112773
+-- hash: 17cddacc9add4af1e8e80e86f1c588245bf8c2999008936f00be07a1a0dab4a0
 
 name:           NCompiler
 version:        0.1.0.0
@@ -34,6 +34,7 @@ library
       Paths_NCompiler
   hs-source-dirs:
       src
+  default-extensions: LambdaCase
   ghc-options: -Wall
   build-depends:
       base >=4.7 && <5
@@ -47,6 +48,7 @@ executable NCompiler-exe
       Paths_NCompiler
   hs-source-dirs:
       app
+  default-extensions: LambdaCase
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Wall
   build-depends:
       NCompiler
@@ -62,6 +64,7 @@ test-suite NCompiler-test
       Paths_NCompiler
   hs-source-dirs:
       test
+  default-extensions: LambdaCase
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       NCompiler

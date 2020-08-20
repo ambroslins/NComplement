@@ -15,11 +15,8 @@ data Expression
   | Gt Expression Expression
 
 instance Show Expression where
-  show e = case e of
-    Lit l -> case l of
-      LitBool x -> show x
-      LitInteger x -> show x
-      LitReal x -> show x
+  show = \case
+    Lit l -> show l
     Var n -> n
     Neg x -> '-' : show x
     Add x y -> infixOp "+" x y
@@ -37,6 +34,12 @@ data Literal
   | LitInteger Integer
   | LitReal Double
 
+instance Show Literal where
+  show = \case
+    LitBool x -> show x
+    LitInteger x -> show x
+    LitReal x -> show x
+
 data Type
   = Bool
   | Integer
@@ -51,7 +54,7 @@ data TypeError
 type Env = [(Name, Type)]
 
 typeof :: Env -> Expression -> Either TypeError Type
-typeof env e = case e of
+typeof env = \case
   Lit l -> pure $ case l of
     LitBool _ -> Bool
     LitInteger _ -> Integer

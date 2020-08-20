@@ -24,6 +24,9 @@ dependencies:
 - parsec
 - mtl
 
+default-extensions:
+  - LambdaCase
+
 library:
   source-dirs: src
   ghc-options:
