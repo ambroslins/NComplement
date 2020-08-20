@@ -1,7 +1,10 @@
 module Expression where
 
+type Name = String
+
 data Expression
   = Lit Literal
+  | Var Name
   | Neg Expression
   | Add Expression Expression
   | Sub Expression Expression
@@ -13,26 +16,26 @@ data Expression
 
 instance Show Expression where
   show e = case e of
-        Lit l -> case l of
-          LitBool x -> show x
-          LitInteger x -> show x
-          LitReal x -> show x
-        Neg x -> '-':show x
-        Add x y -> infixOp "+" x y
-        Sub x y -> infixOp "-" x y
-        Mul x y -> infixOp "*" x y
-        Div x y -> infixOp "/" x y
-        Eq x y -> infixOp "=" x y
-        Lt x y -> infixOp "<" x y
-        Gt x y -> infixOp ">" x y
-    where 
+    Lit l -> case l of
+      LitBool x -> show x
+      LitInteger x -> show x
+      LitReal x -> show x
+    Var n -> n
+    Neg x -> '-' : show x
+    Add x y -> infixOp "+" x y
+    Sub x y -> infixOp "-" x y
+    Mul x y -> infixOp "*" x y
+    Div x y -> infixOp "/" x y
+    Eq x y -> infixOp "=" x y
+    Lt x y -> infixOp "<" x y
+    Gt x y -> infixOp ">" x y
+    where
       infixOp s x y = "(" ++ show x ++ s ++ show y ++ ")"
 
 data Literal
   = LitBool Bool
   | LitInteger Integer
   | LitReal Double
-  deriving (Show)
 
 data Type
   = Bool
@@ -40,16 +43,24 @@ data Type
   | Real
   deriving (Eq, Show)
 
-data TypeError = TypeError deriving (Show)
+data TypeError
+  = TypeError
+  | NotInScope Name
+  deriving (Show)
 
-typeof :: Expression -> Either TypeError Type
-typeof e = case e of
+type Env = [(Name, Type)]
+
+typeof :: Env -> Expression -> Either TypeError Type
+typeof env e = case e of
   Lit l -> pure $ case l of
     LitBool _ -> Bool
     LitInteger _ -> Integer
     LitReal _ -> Real
+  Var v -> case lookup v env of
+    Nothing -> Left $ NotInScope v
+    Just t -> pure t
   Neg x -> do
-    t <- typeof x
+    t <- typeof env x
     case t of
       Integer -> pure Integer
       Real -> pure Real
@@ -59,22 +70,22 @@ typeof e = case e of
   Mul x y -> multiplicative x y
   Div x y -> multiplicative x y
   Eq x y -> do
-    tx <- typeof x
-    ty <- typeof y
+    tx <- typeof env x
+    ty <- typeof env y
     if tx == ty then pure Bool else Left TypeError
   Lt x y -> comparative x y
   Gt x y -> comparative x y
   where
     additive x y = do
-      tx <- typeof x
-      ty <- typeof y
+      tx <- typeof env x
+      ty <- typeof env y
       case (tx, ty) of
         (Integer, Integer) -> pure Integer
         (Real, Real) -> pure Real
         _ -> Left TypeError
     multiplicative x y = do
-      tx <- typeof x
-      ty <- typeof y
+      tx <- typeof env x
+      ty <- typeof env y
       case (tx, ty) of
         (Integer, Integer) -> pure Integer
         (Integer, Real) -> pure Real
@@ -82,8 +93,8 @@ typeof e = case e of
         (Real, Real) -> pure Real
         _ -> Left TypeError
     comparative x y = do
-      tx <- typeof x
-      ty <- typeof y
+      tx <- typeof env x
+      ty <- typeof env y
       case (tx, ty) of
         (Integer, Integer) -> pure Bool
         (Real, Real) -> pure Bool

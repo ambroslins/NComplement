@@ -13,13 +13,14 @@ expr =
     <?> "expression"
 
 term :: Parsec String st Expression
-term = parens expr <|> Lit <$> literal
+term = parens expr <|> Lit <$> literal <|> variabel
   where
     literal =
       (symbol "True" *> pure (LitBool True))
         <|> (symbol "False" *> pure (LitBool False))
         <|> LitReal <$> try float
         <|> LitInteger <$> integer
+    variabel = Var <$> identifier
 
 table :: OperatorTable String st Identity Expression
 table =
@@ -37,6 +38,7 @@ lexer =
   Token.makeTokenParser
     emptyDef
       { Token.commentLine = "--",
+        Token.identStart = lower <|> char '_',
         Token.opStart = oneOf "+-*/=<>"
       }
 
