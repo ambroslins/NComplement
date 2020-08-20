@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6928cb2d9e43d5e2c2c9780dc42ff402efb575bdc3bc8e3f25b7b4e44f99d63e
+-- hash: f48a81ce4b8b7c34de557a11687e2197f4300556299fa0e6be72b5953ca4a134
 
 name:           NCompiler
 version:        0.1.0.0
@@ -27,13 +27,16 @@ source-repository head
 
 library
   exposed-modules:
+      Expression
       Lib
+      Parser
   other-modules:
       Paths_NCompiler
   hs-source-dirs:
       src
   build-depends:
       base >=4.7 && <5
+    , parsec
   default-language: Haskell2010
 
 executable NCompiler-exe
@@ -46,6 +49,7 @@ executable NCompiler-exe
   build-depends:
       NCompiler
     , base >=4.7 && <5
+    , parsec
   default-language: Haskell2010
 
 test-suite NCompiler-test
@@ -59,4 +63,5 @@ test-suite NCompiler-test
   build-depends:
       NCompiler
     , base >=4.7 && <5
+    , parsec
   default-language: Haskell2010
