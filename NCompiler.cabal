@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: af4b3bd9aa4dce22bed2fab108ec7d9bdf9e6d53244637efd6570cc792c11ee5
+-- hash: 12b6b66ab16477d6bbe5994041d9296a28a117e3af7f1099cd7ab58958112773
 
 name:           NCompiler
 version:        0.1.0.0
@@ -37,6 +37,7 @@ library
   ghc-options: -Wall
   build-depends:
       base >=4.7 && <5
+    , mtl
     , parsec
   default-language: Haskell2010
 
@@ -50,6 +51,7 @@ executable NCompiler-exe
   build-depends:
       NCompiler
     , base >=4.7 && <5
+    , mtl
     , parsec
   default-language: Haskell2010
 
@@ -64,5 +66,6 @@ test-suite NCompiler-test
   build-depends:
       NCompiler
     , base >=4.7 && <5
+    , mtl
     , parsec
   default-language: Haskell2010

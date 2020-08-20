@@ -17,6 +17,7 @@ instance Show Expression where
           LitBool x -> show x
           LitInteger x -> show x
           LitReal x -> show x
+        Neg x -> '-':show x
         Add x y -> infixOp "+" x y
         Sub x y -> infixOp "-" x y
         Mul x y -> infixOp "*" x y
@@ -61,8 +62,8 @@ typeof e = case e of
     tx <- typeof x
     ty <- typeof y
     if tx == ty then pure Bool else Left TypeError
-  Lt x y -> additive x y
-  Gt x y -> additive x y
+  Lt x y -> comparative x y
+  Gt x y -> comparative x y
   where
     additive x y = do
       tx <- typeof x
