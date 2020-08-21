@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 17cddacc9add4af1e8e80e86f1c588245bf8c2999008936f00be07a1a0dab4a0
+-- hash: e6fedce5de1d9e88a7a104029c50009014e254829d65d9ea91ab9aaf11672218
 
 name:           NCompiler
 version:        0.1.0.0
@@ -30,6 +30,7 @@ library
       Expression
       Lib
       Parser
+      Statement
   other-modules:
       Paths_NCompiler
   hs-source-dirs:
