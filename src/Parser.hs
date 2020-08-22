@@ -16,19 +16,19 @@ statements = sepEndBy statement sep
     sep = lexeme $ void (semicolon >> optional newline) <|> void newline
 
 statement :: Parser Statement
-statement = assignment <|> ifStatement
+statement = ifStatement <|> assignment
   where
-    assignment = try $ do
-      var <- identifier
-      _ <- symbol "="
-      e <- expression
-      pure $ Assignment var e
-    ifStatement = try $ do
-      _ <- symbol "if"
+    ifStatement = do
+      reserved "if"
       cond <- expression
       sThen <- braces statements
-      sElse <- option [] $ symbol "else" *> braces statements
+      sElse <- option [] $ reserved "else" *> braces statements
       pure $ If cond sThen sElse
+    assignment = do
+      var <- identifier
+      reserved "="
+      e <- expression
+      pure $ Assignment var e
 
 expression :: Parser Expression
 expression =
@@ -74,6 +74,9 @@ identifier = lexeme $ do
   x <- lowerChar <|> char '_'
   xs <- many $ alphaNumChar <|> char '_'
   pure $ x : xs
+
+reserved :: String -> Parser ()
+reserved x = lexeme $ string x >> notFollowedBy (alphaNumChar <|> char '_')
 
 natural :: Parser Integer
 natural = lexeme Lexer.decimal
