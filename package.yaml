@@ -24,9 +24,11 @@ dependencies:
 - megaparsec
 - parser-combinators
 - mtl
+- containers
 
 default-extensions:
   - LambdaCase
+  - FlexibleContexts
 
 library:
   source-dirs: src
