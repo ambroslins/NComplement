@@ -1,10 +1,9 @@
 module Parser where
 
+import AST
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr
 import Data.Void (Void)
-import Expression
-import Statement
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer

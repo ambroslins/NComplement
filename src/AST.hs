@@ -1,4 +1,9 @@
-module Expression where
+module AST where
+
+data Statement
+  = Assignment Name Expression
+  | If Expression [Statement] [Statement]
+  deriving (Show)
 
 type Name = String
 
@@ -41,13 +46,13 @@ instance Show Literal where
     LitReal x -> show x
 
 data Type
-  = Bool
-  | Integer
-  | Real
+  = TypeBool
+  | TypeInteger
+  | TypeReal
   deriving (Eq, Show)
 
 data TypeError
-  = TypeError
+  = TypeMissmatch
   | NotInScope Name
   deriving (Show)
 
@@ -56,18 +61,18 @@ type Env = [(Name, Type)]
 typeof :: Env -> Expression -> Either TypeError Type
 typeof env = \case
   Lit l -> pure $ case l of
-    LitBool _ -> Bool
-    LitInteger _ -> Integer
-    LitReal _ -> Real
+    LitBool _ -> TypeBool
+    LitInteger _ -> TypeInteger
+    LitReal _ -> TypeReal
   Var v -> case lookup v env of
     Nothing -> Left $ NotInScope v
     Just t -> pure t
   Neg x -> do
     t <- typeof env x
     case t of
-      Integer -> pure Integer
-      Real -> pure Real
-      _ -> Left TypeError
+      TypeInteger -> pure TypeInteger
+      TypeReal -> pure TypeReal
+      _ -> Left TypeMissmatch
   Add x y -> additive x y
   Sub x y -> additive x y
   Mul x y -> multiplicative x y
@@ -75,7 +80,7 @@ typeof env = \case
   Eq x y -> do
     tx <- typeof env x
     ty <- typeof env y
-    if tx == ty then pure Bool else Left TypeError
+    if tx == ty then pure TypeBool else Left TypeMissmatch
   Lt x y -> comparative x y
   Gt x y -> comparative x y
   where
@@ -83,22 +88,22 @@ typeof env = \case
       tx <- typeof env x
       ty <- typeof env y
       case (tx, ty) of
-        (Integer, Integer) -> pure Integer
-        (Real, Real) -> pure Real
-        _ -> Left TypeError
+        (TypeInteger, TypeInteger) -> pure TypeInteger
+        (TypeReal, TypeReal) -> pure TypeReal
+        _ -> Left TypeMissmatch
     multiplicative x y = do
       tx <- typeof env x
       ty <- typeof env y
       case (tx, ty) of
-        (Integer, Integer) -> pure Integer
-        (Integer, Real) -> pure Real
-        (Real, Integer) -> pure Real
-        (Real, Real) -> pure Real
-        _ -> Left TypeError
+        (TypeInteger, TypeInteger) -> pure TypeInteger
+        (TypeInteger, TypeReal) -> pure TypeReal
+        (TypeReal, TypeInteger) -> pure TypeReal
+        (TypeReal, TypeReal) -> pure TypeReal
+        _ -> Left TypeMissmatch
     comparative x y = do
       tx <- typeof env x
       ty <- typeof env y
       case (tx, ty) of
-        (Integer, Integer) -> pure Bool
-        (Real, Real) -> pure Bool
-        _ -> Left TypeError
+        (TypeInteger, TypeInteger) -> pure TypeBool
+        (TypeReal, TypeReal) -> pure TypeBool
+        _ -> Left TypeMissmatch
