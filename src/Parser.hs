@@ -1,19 +1,41 @@
 module Parser where
 
+import Control.Monad (void)
 import Control.Monad.Identity (Identity)
 import Expression
+import Statement
 import Text.Parsec
 import Text.Parsec.Expr
 import Text.Parsec.Language (emptyDef)
 import qualified Text.Parsec.Token as Token
 
-expr :: Parsec String st Expression
-expr =
+statements :: Parsec String st [Statement]
+statements = sepEndBy statement sep
+  where
+    sep = (char ';' >> optional endOfLine) <|> void endOfLine
+
+statement :: Parsec String st Statement
+statement = assignment <|> ifStatement
+  where
+    assignment = do
+      var <- identifier
+      reservedOp "="
+      e <- expression
+      pure $ Assignment var e
+    ifStatement = do
+      reserved "if"
+      cond <- expression
+      sThen <- braces statements
+      sElse <- option [] $ reserved "else" *> braces statements
+      pure $ If cond sThen sElse
+
+expression :: Parsec String st Expression
+expression =
   buildExpressionParser table term
     <?> "expression"
 
 term :: Parsec String st Expression
-term = parens expr <|> Lit <$> literal <|> variabel
+term = parens expression <|> Lit <$> literal <|> variabel
   where
     literal =
       (symbol "True" *> pure (LitBool True))
@@ -39,11 +61,16 @@ lexer =
     emptyDef
       { Token.commentLine = "--",
         Token.identStart = lower <|> char '_',
-        Token.opStart = oneOf "+-*/=<>"
+        Token.opStart = oneOf "+-*/=<>",
+        Token.reservedNames = ["if", "else"],
+        Token.reservedOpNames = ["+", "-", "*", "/", "<", ">"]
       }
 
 identifier :: Parsec String st String
 identifier = Token.identifier lexer
+
+reserved :: String -> Parsec String st ()
+reserved = Token.reserved lexer
 
 reservedOp :: String -> Parsec String st ()
 reservedOp = Token.reservedOp lexer
