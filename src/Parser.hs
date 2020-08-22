@@ -1,118 +1,98 @@
 module Parser where
 
 import Control.Monad (void)
-import Control.Monad.Identity (Identity)
+import Control.Monad.Combinators.Expr
+import Data.Void (Void)
 import Expression
 import Statement
-import Text.Parsec
-import Text.Parsec.Expr
-import Text.Parsec.Language (emptyDef)
-import qualified Text.Parsec.Token as Token
+import Text.Megaparsec
+import Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer as Lexer
 
-statements :: Parsec String st [Statement]
+type Parser = Parsec Void String
+
+statements :: Parser [Statement]
 statements = sepEndBy statement sep
   where
-    sep = (char ';' >> optional endOfLine) <|> void endOfLine
+    sep = lexeme $ void (semicolon >> optional newline) <|> void newline
 
-statement :: Parsec String st Statement
+statement :: Parser Statement
 statement = assignment <|> ifStatement
   where
-    assignment = do
+    assignment = try $ do
       var <- identifier
-      reservedOp "="
+      _ <- symbol "="
       e <- expression
       pure $ Assignment var e
-    ifStatement = do
-      reserved "if"
+    ifStatement = try $ do
+      _ <- symbol "if"
       cond <- expression
       sThen <- braces statements
-      sElse <- option [] $ reserved "else" *> braces statements
+      sElse <- option [] $ symbol "else" *> braces statements
       pure $ If cond sThen sElse
 
-expression :: Parsec String st Expression
+expression :: Parser Expression
 expression =
-  buildExpressionParser table term
-    <?> "expression"
+  makeExprParser term table <?> "expression"
 
-term :: Parsec String st Expression
+term :: Parser Expression
 term = parens expression <|> Lit <$> literal <|> variabel
   where
     literal =
       (symbol "True" *> pure (LitBool True))
         <|> (symbol "False" *> pure (LitBool False))
-        <|> LitReal <$> try float
+        <|> LitReal <$> try real
         <|> LitInteger <$> integer
     variabel = Var <$> identifier
 
-table :: OperatorTable String st Identity Expression
+table :: [[Operator Parser Expression]]
 table =
   [ [prefix "-" Neg, prefix "+" id],
-    [binary "*" Mul AssocLeft, binary "/" Div AssocLeft],
-    [binary "+" Add AssocLeft, binary "-" Sub AssocLeft],
-    [binary "=" Eq AssocNone, binary "<" Lt AssocNone, binary ">" Gt AssocNone]
+    [infixLeft "*" Mul, infixLeft "/" Div],
+    [infixLeft "+" Add, infixLeft "-" Sub],
+    [infixNone "=" Eq, infixNone "<" Lt, infixNone ">" Gt]
   ]
   where
-    binary name fun assoc = Infix (do reservedOp name; return fun) assoc
-    prefix name fun = Prefix (do reservedOp name; return fun)
+    prefix name f = Prefix (f <$ symbol name)
+    infixLeft name f = InfixL (f <$ symbol name)
+    infixNone name f = InfixN (f <$ symbol name)
 
-lexer :: Token.GenTokenParser String st Identity
-lexer =
-  Token.makeTokenParser
-    emptyDef
-      { Token.commentLine = "--",
-        Token.identStart = lower <|> char '_',
-        Token.opStart = oneOf "+-*/=<>",
-        Token.reservedNames = ["if", "else"],
-        Token.reservedOpNames = ["+", "-", "*", "/", "<", ">"]
-      }
+sc :: Parser ()
+sc =
+  Lexer.space
+    (void $ some (oneOf " \t"))
+    (Lexer.skipLineComment "#")
+    empty
 
-identifier :: Parsec String st String
-identifier = Token.identifier lexer
+lexeme :: Parser a -> Parser a
+lexeme = Lexer.lexeme sc
 
-reserved :: String -> Parsec String st ()
-reserved = Token.reserved lexer
+symbol :: String -> Parser String
+symbol = Lexer.symbol sc
 
-reservedOp :: String -> Parsec String st ()
-reservedOp = Token.reservedOp lexer
+identifier :: Parser String
+identifier = lexeme $ do
+  x <- lowerChar <|> char '_'
+  xs <- many $ alphaNumChar <|> char '_'
+  pure $ x : xs
 
-natural :: Parsec String u Integer
-natural = Token.natural lexer
+natural :: Parser Integer
+natural = lexeme Lexer.decimal
 
-integer :: Parsec String u Integer
-integer = Token.integer lexer
+integer :: Parser Integer
+integer = lexeme $ Lexer.signed empty natural
 
-float :: Parsec String u Double
-float = Token.float lexer
+real :: Parser Double
+real = lexeme Lexer.float
 
-symbol :: String -> Parsec String u String
-symbol = Token.symbol lexer
+parens :: Parser a -> Parser a
+parens = between (symbol "(") (symbol ")")
 
-lexeme :: Parsec String u a -> Parsec String u a
-lexeme = Token.lexeme lexer
+braces :: Parser a -> Parser a
+braces = between (symbol "{") (symbol "}")
 
-whiteSpace :: Parsec String u ()
-whiteSpace = Token.whiteSpace lexer
+semicolon :: Parser String
+semicolon = symbol ";"
 
-parens :: Parsec String u a -> Parsec String u a
-parens = Token.parens lexer
-
-braces :: Parsec String u a -> Parsec String u a
-braces = Token.braces lexer
-
-angles :: Parsec String u a -> Parsec String u a
-angles = Token.angles lexer
-
-brackets :: Parsec String u a -> Parsec String u a
-brackets = Token.brackets lexer
-
-semi :: Parsec String u String
-semi = Token.semi lexer
-
-comma :: Parsec String u String
-comma = Token.comma lexer
-
-colon :: Parsec String u String
-colon = Token.colon lexer
-
-semiSep :: Parsec String u a -> Parsec String u [a]
-semiSep = Token.semiSep lexer
+comma :: Parser String
+comma = symbol ","
