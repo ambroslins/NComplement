@@ -84,6 +84,11 @@ lexeme = Lexer.lexeme sc
 symbol :: String -> Parser String
 symbol = Lexer.symbol sc
 
+symbolNewLine :: String -> Parser String
+symbolNewLine s = new *> symbol s <* new
+  where
+    new = lexeme $ optional newline
+
 identifier :: Parser String
 identifier = lexeme $ do
   x <- lowerChar <|> char '_'
@@ -106,7 +111,7 @@ parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
 braces :: Parser a -> Parser a
-braces = between (symbol "{") (symbol "}")
+braces = between (symbolNewLine "{") (symbolNewLine "}")
 
 semicolon :: Parser String
 semicolon = symbol ";"
