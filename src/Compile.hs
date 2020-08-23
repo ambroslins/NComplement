@@ -3,7 +3,6 @@ module Compile where
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Bifunctor (bimap)
-import Data.List (intercalate)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Expression (Expression, Name)
@@ -43,7 +42,7 @@ runCompiler s =
             $ parse (statements <* eof) "NCompiler" s
    in case res of
         Left e -> e
-        Right xs -> either show (intercalate ";\n") xs
+        Right xs -> either show (unlines . map (++";")) xs
 
 compile :: Compiler a -> Either Error a
 compile = flip evalState start . runExceptT
