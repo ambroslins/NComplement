@@ -1,8 +1,9 @@
 module Parser where
 
 import AST
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Control.Monad.Combinators.Expr
+import qualified Data.Set as Set
 import Data.Void (Void)
 import Text.Megaparsec
 import Text.Megaparsec.Char
@@ -35,13 +36,16 @@ expression =
   makeExprParser term table <?> "expression"
 
 term :: Parser Expression
-term = parens expression <|> Lit <$> literal <|> variabel
+term = parens expression <|> literal <|> reference <|> variabel
   where
     literal =
-      (symbol "True" *> pure (LitBool True))
-        <|> (symbol "False" *> pure (LitBool False))
-        <|> LitReal <$> try real
-        <|> LitInteger <$> integer
+      Lit
+        <$> ( LitBool True <$ symbol "True"
+                <|> LitBool False <$ symbol "False"
+                <|> LitReal <$> try real
+                <|> LitInteger <$> integer
+            )
+    reference = char '&' >> Ref <$> identifier
     variabel = Var <$> identifier
 
 table :: [[Operator Parser Expression]]
@@ -73,7 +77,11 @@ identifier :: Parser String
 identifier = lexeme $ do
   x <- lowerChar <|> char '_'
   xs <- many $ alphaNumChar <|> char '_'
+  let i = x : xs
+  when (Set.member i reservedNames) $ fail $ i ++ " is a reserved keyword"
   pure $ x : xs
+  where
+    reservedNames = Set.fromList ["if", "else"]
 
 reserved :: String -> Parser ()
 reserved x = lexeme $ string x >> notFollowedBy (alphaNumChar <|> char '_')

@@ -10,6 +10,7 @@ type Name = String
 data Expression
   = Lit Literal
   | Var Name
+  | Ref Name
   | Neg Expression
   | Add Expression Expression
   | Sub Expression Expression
@@ -23,6 +24,7 @@ instance Show Expression where
   show = \case
     Lit l -> show l
     Var n -> n
+    Ref n -> '&' : show n
     Neg x -> '-' : show x
     Add x y -> infixOp "+" x y
     Sub x y -> infixOp "-" x y
@@ -55,4 +57,3 @@ data TypeError
   = TypeMissmatch
   | NotInScope Name
   deriving (Show)
-

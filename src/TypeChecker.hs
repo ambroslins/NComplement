@@ -40,6 +40,9 @@ typeof env = \case
   Var v -> case Map.lookup v env of
     Nothing -> throwError $ NotInScope v
     Just t -> pure t
+  Ref v -> case Map.lookup v env of
+    Nothing -> throwError $ NotInScope v
+    Just t -> pure t
   Neg x -> do
     t <- typeof env x
     case t of
