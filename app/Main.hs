@@ -1,6 +1,8 @@
 module Main where
 
-import Lib
+import Control.Monad (forever)
+import Parse (statements)
+import Text.Megaparsec (parseTest)
 
 main :: IO ()
-main = someFunc
+main = forever $ getLine >>= parseTest statements
