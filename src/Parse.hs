@@ -1,10 +1,12 @@
-module Parser where
+module Parse where
 
-import AST
-import Control.Monad (void, when)
+import Control.Monad (void)
 import Control.Monad.Combinators.Expr
-import qualified Data.Set as Set
 import Data.Void (Void)
+import Expression (Expression)
+import qualified Expression as Expr
+import Statement (Statement)
+import qualified Statement as Stmt
 import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
@@ -20,16 +22,16 @@ statement :: Parser Statement
 statement = ifStatement <|> assignment
   where
     ifStatement = do
-      reserved "if"
+      reserved "If"
       cond <- expression
       sThen <- braces statements
-      sElse <- option [] $ reserved "else" *> braces statements
-      pure $ If cond sThen sElse
+      sElse <- option [] $ reserved "Else" *> braces statements
+      pure $ Stmt.If cond sThen sElse
     assignment = do
       var <- identifier
       reserved "="
       e <- expression
-      pure $ Assignment var e
+      pure $ Stmt.Assign var e
 
 expression :: Parser Expression
 expression =
@@ -39,21 +41,30 @@ term :: Parser Expression
 term = parens expression <|> literal <|> reference <|> variabel
   where
     literal =
-      Lit
-        <$> ( LitBool True <$ symbol "True"
-                <|> LitBool False <$ symbol "False"
-                <|> LitReal <$> try real
-                <|> LitInteger <$> integer
+      Expr.Lit
+        <$> ( Expr.LitBool True <$ symbol "True"
+                <|> Expr.LitBool False <$ symbol "False"
+                <|> Expr.LitReal <$> try real
+                <|> Expr.LitInteger <$> integer
             )
-    reference = char '&' >> Ref <$> identifier
-    variabel = Var <$> identifier
+    reference = char '&' >> Expr.Ref <$> identifier
+    variabel = Expr.Var <$> identifier
 
 table :: [[Operator Parser Expression]]
 table =
-  [ [prefix "-" Neg, prefix "+" id],
-    [infixLeft "*" Mul, infixLeft "/" Div],
-    [infixLeft "+" Add, infixLeft "-" Sub],
-    [infixNone "=" Eq, infixNone "<" Lt, infixNone ">" Gt]
+  [ [ prefix "-" Expr.Neg,
+      prefix "+" id
+    ],
+    [ infixLeft "*" (Expr.Op Expr.Mul),
+      infixLeft "/" (Expr.Op Expr.Div)
+    ],
+    [ infixLeft "+" (Expr.Op Expr.Add),
+      infixLeft "-" (Expr.Op Expr.Sub)
+    ],
+    [ infixNone "=" (Expr.Op Expr.Eq),
+      infixNone "<" (Expr.Op Expr.Lt),
+      infixNone ">" (Expr.Op Expr.Gt)
+    ]
   ]
   where
     prefix name f = Prefix (f <$ symbol name)
@@ -77,11 +88,7 @@ identifier :: Parser String
 identifier = lexeme $ do
   x <- lowerChar <|> char '_'
   xs <- many $ alphaNumChar <|> char '_'
-  let i = x : xs
-  when (Set.member i reservedNames) $ fail $ i ++ " is a reserved keyword"
   pure $ x : xs
-  where
-    reservedNames = Set.fromList ["if", "else"]
 
 reserved :: String -> Parser ()
 reserved x = lexeme $ string x >> notFollowedBy (alphaNumChar <|> char '_')
