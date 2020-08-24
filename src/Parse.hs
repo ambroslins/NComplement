@@ -2,6 +2,8 @@ module Parse where
 
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr
+import Data.Text (Text)
+import qualified Data.Text as Text
 import Data.Void (Void)
 import Expression (Expression)
 import qualified Expression as Expr
@@ -11,7 +13,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 
-type Parser = Parsec Void String
+type Parser = Parsec Void Text
 
 statements :: Parser [Statement]
 statements = sepEndBy statement sep
@@ -74,23 +76,23 @@ table =
 sc :: Parser ()
 sc =
   Lexer.space
-    (void $ some (oneOf " \t"))
+    (void $ some (oneOf [' ', '\t']))
     (Lexer.skipLineComment "#")
     empty
 
 lexeme :: Parser a -> Parser a
 lexeme = Lexer.lexeme sc
 
-symbol :: String -> Parser String
+symbol :: Text -> Parser Text
 symbol = Lexer.symbol sc
 
-identifier :: Parser String
+identifier :: Parser Text
 identifier = lexeme $ do
   x <- lowerChar <|> char '_'
   xs <- many $ alphaNumChar <|> char '_'
-  pure $ x : xs
+  pure $ Text.pack (x : xs)
 
-reserved :: String -> Parser ()
+reserved :: Text -> Parser ()
 reserved x = lexeme $ string x >> notFollowedBy (alphaNumChar <|> char '_')
 
 natural :: Parser Integer
@@ -110,8 +112,8 @@ braces = between (symbol "{" <* nl) (nl *> symbol "}")
   where
     nl = lexeme $ optional newline
 
-semicolon :: Parser String
+semicolon :: Parser Text
 semicolon = symbol ";"
 
-comma :: Parser String
+comma :: Parser Text
 comma = symbol ","

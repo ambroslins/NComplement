@@ -5,6 +5,8 @@ import Control.Monad.State
 import Data.Bifunctor (bimap)
 import Data.Map (Map)
 import qualified Data.Map as Map
+import Data.Text (Text)
+import qualified Data.Text as Text
 import Expression (Expression, Name)
 import qualified Expression as Expr
 import Parse
@@ -32,7 +34,10 @@ data Variable = Variable
     address :: Int
   }
 
-runCompiler :: String -> String
+showText :: Show a => a -> Text
+showText = Text.pack . show
+
+runCompiler :: Text -> Text
 runCompiler s =
   let res =
         fmap compile $
@@ -41,15 +46,15 @@ runCompiler s =
             (fmap concat . mapM compileStatement)
             $ parse (statements <* eof) "NCompiler" s
    in case res of
-        Left e -> e
-        Right xs -> either show (unlines . map (++ ";")) xs
+        Left e -> showText e
+        Right xs -> either showText (Text.unlines . fmap (<> ";")) xs
 
 compile :: Compiler a -> Either Error a
 compile = flip evalState start . runExceptT
   where
     start = CompilerState {recordNumber = 0, variables = Map.empty}
 
-compileStatement :: Statement -> Compiler [String]
+compileStatement :: Statement -> Compiler [Text]
 compileStatement stmt = do
   case stmt of
     Stmt.Assign name expr -> do
@@ -63,7 +68,7 @@ compileStatement stmt = do
           pure a
         Just var -> do
           if t == type' var then pure $ address var else throwError $ TypeError
-      pure $ pure $ 'H' : show adr ++ " = " ++ e
+      pure $ ["H" <> showText adr <> " = " <> e]
     Stmt.If cond thens elses -> do
       vars <- gets variables
       (t, e) <- compileExpression vars cond
@@ -72,35 +77,35 @@ compileStatement stmt = do
       rnEnd <- nextRecordNumber
       concat
         <$> sequence
-          [ pure ["IF " ++ e ++ " (," ++ show rnElse ++ ")"],
+          [ pure ["IF " <> e <> " (," <> showText rnElse <> ")"],
             (concat <$> mapM compileStatement thens),
-            pure ["JUMP" ++ show rnEnd, "N" ++ show rnElse],
+            pure ["JUMP" <> showText rnEnd, "N" <> showText rnElse],
             (concat <$> mapM compileStatement elses),
-            pure ["N" ++ show rnEnd]
+            pure ["N" <> showText rnEnd]
           ]
 
-compileExpression :: (MonadError Error m) => Map Name Variable -> Expression -> m (Type, String)
+compileExpression :: (MonadError Error m) => Map Name Variable -> Expression -> m (Type, Text)
 compileExpression vars expr = case expr of
   Expr.Lit lit -> pure $ case lit of
-    Expr.LitBool x -> (Type.Bool, show x)
-    Expr.LitInteger x -> (Type.Integer, show x)
-    Expr.LitReal x -> (Type.Real, show x)
+    Expr.LitBool x -> (Type.Bool, showText x)
+    Expr.LitInteger x -> (Type.Integer, showText x)
+    Expr.LitReal x -> (Type.Real, showText x)
   Expr.Var name -> case Map.lookup name vars of
     Nothing -> throwError $ NotInScope name
-    Just var -> pure (type' var, 'H' : show (address var))
+    Just var -> pure (type' var, "H" <> showText (address var))
   Expr.Ref name -> case Map.lookup name vars of
     Nothing -> throwError $ NotInScope name
-    Just var -> pure (type' var, show $ address var)
+    Just var -> pure (type' var, showText $ address var)
   Expr.Neg x -> do
     (t, e) <- compileExpression vars x
     case t of
-      Type.Integer -> pure (Type.Integer, '-' : e)
-      Type.Real -> pure (Type.Real, '-' : e)
+      Type.Integer -> pure (Type.Integer, "-" <> showText e)
+      Type.Real -> pure (Type.Real, "-" <> e)
       _ -> throwError $ TypeError
   Expr.Op op x y -> do
     (tx, ex) <- compileExpression vars x
     (ty, ey) <- compileExpression vars y
-    let formatInfix s = "(" ++ ex ++ s ++ ey ++ ")"
+    let formatInfix s = "(" <> ex <> s <> ey <> ")"
     let additive s = do
           t <- case (tx, ty) of
             (Type.Integer, Type.Integer) -> pure Type.Integer
@@ -111,7 +116,7 @@ compileExpression vars expr = case expr of
           (Type.Integer, Type.Integer) -> pure (Type.Integer, formatInfix s)
           (Type.Integer, Type.Real) -> pure (Type.Real, formatInfix s)
           (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix s)
-          (Type.Real, Type.Real) -> pure (Type.Real, "(" ++ ex ++ s ++ ey ++ c ++ "1.)")
+          (Type.Real, Type.Real) -> pure (Type.Real, "(" <> ex <> s <> ey <> c <> "1.)")
           (_, _) -> throwError $ Error
     let comparative s = do
           t <- case (tx, ty) of

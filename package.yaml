@@ -25,10 +25,12 @@ dependencies:
 - parser-combinators
 - mtl
 - containers
+- text
 
 default-extensions:
   - LambdaCase
   - FlexibleContexts
+  - OverloadedStrings
 
 library:
   source-dirs: src

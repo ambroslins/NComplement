@@ -1,6 +1,7 @@
 module Main where
 
 import Compile (runCompiler)
+import qualified Data.Text.IO as Text
 
 main :: IO ()
-main = interact runCompiler
+main = Text.interact runCompiler

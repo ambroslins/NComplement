@@ -1,11 +1,7 @@
-module Type (Type (..), Error (..)) where
+module Type (Type (..)) where
 
 data Type
   = Bool
   | Integer
   | Real
   deriving (Eq, Show)
-
-data Error
-  = Error
-  | NotInScope String
