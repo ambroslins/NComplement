@@ -1,8 +1,10 @@
 module Compile where
 
+import qualified Code
 import Control.Monad.Except
 import Control.Monad.State
 import Data.Bifunctor (bimap)
+import Data.Foldable (toList)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -46,7 +48,7 @@ runCompiler s =
             compileProgram
             $ parse (statements <* eof) "NCompiler" s
    in case res of
-        Left e -> showText e
+        Left e -> Text.pack e
         Right xs -> either showText (Text.unlines . fmap (<> ";")) xs
 
 compile :: Compiler a -> Either Error a
@@ -96,6 +98,14 @@ compileStatement stmt = do
             pure ["N" <> showText rnEnd]
           ]
     Stmt.Scope stmts -> (fmap ("  " <>) . concat) <$> mapM compileStatement stmts
+    Stmt.Code c -> case c of
+      Code.G00 xs -> do
+        vars <- gets variables
+        let f (a, expr) = do
+              (t, e) <- compileExpression vars expr
+              if t == Type.Real then pure $ showText a <> e else throwError $ Error
+        as <- mapM f $ toList xs
+        pure $ pure $ "G00 " <> Text.intercalate " " as
 
 compileExpression :: (MonadError Error m) => Map Name Variable -> Expression -> m (Type, Text)
 compileExpression vars expr = case expr of

@@ -1,5 +1,8 @@
 module Parse where
 
+import Code (Code)
+import qualified Code
+import qualified Control.Applicative.Combinators.NonEmpty as NonEmpty
 import Control.Monad (void)
 import Control.Monad.Combinators.Expr
 import Data.Text (Text)
@@ -21,7 +24,7 @@ statements = sepEndBy statement sep
     sep = lexeme (void semicolon <|> void newline) >> many (lexeme newline)
 
 statement :: Parser Statement
-statement = choice [ifStatement, assignment, scope]
+statement = choice [ifStatement, assignment, scope, Stmt.Code <$> code]
   where
     ifStatement = do
       reserved "If"
@@ -35,6 +38,24 @@ statement = choice [ifStatement, assignment, scope]
       e <- expression
       pure $ Stmt.Assign var e
     scope = Stmt.Scope <$> braces statements
+
+axis :: Parser Code.Axis
+axis =
+  choice
+    [ Code.X <$ symbol "X",
+      Code.Y <$ symbol "Y",
+      Code.Z <$ symbol "Z",
+      Code.U <$ symbol "U",
+      Code.V <$ symbol "V"
+    ]
+
+code :: Parser Code
+code = Code.G00 <$ symbol "G00" <*> NonEmpty.some p
+  where
+    p = do
+      a <- axis
+      e <- expression
+      pure (a, e)
 
 expression :: Parser Expression
 expression =
