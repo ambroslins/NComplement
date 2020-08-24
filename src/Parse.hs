@@ -16,7 +16,7 @@ type Parser = Parsec Void String
 statements :: Parser [Statement]
 statements = sepEndBy statement sep
   where
-    sep = lexeme $ void (semicolon >> optional newline) <|> void newline
+    sep = lexeme (void semicolon <|> void newline) >> many (lexeme newline)
 
 statement :: Parser Statement
 statement = ifStatement <|> assignment

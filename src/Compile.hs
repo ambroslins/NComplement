@@ -42,7 +42,7 @@ runCompiler s =
             $ parse (statements <* eof) "NCompiler" s
    in case res of
         Left e -> e
-        Right xs -> either show (unlines . map (++";")) xs
+        Right xs -> either show (unlines . map (++ ";")) xs
 
 compile :: Compiler a -> Either Error a
 compile = flip evalState start . runExceptT
