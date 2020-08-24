@@ -21,19 +21,20 @@ statements = sepEndBy statement sep
     sep = lexeme (void semicolon <|> void newline) >> many (lexeme newline)
 
 statement :: Parser Statement
-statement = ifStatement <|> assignment
+statement = choice [ifStatement, assignment, scope]
   where
     ifStatement = do
       reserved "If"
       cond <- expression
-      sThen <- braces statements
-      sElse <- option [] $ reserved "Else" *> braces statements
+      sThen <- statement
+      sElse <- option (Stmt.Scope []) $ reserved "Else" *> statement
       pure $ Stmt.If cond sThen sElse
     assignment = do
       var <- identifier
       reserved "="
       e <- expression
       pure $ Stmt.Assign var e
+    scope = Stmt.Scope <$> braces statements
 
 expression :: Parser Expression
 expression =

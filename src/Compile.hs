@@ -43,7 +43,7 @@ runCompiler s =
         fmap compile $
           bimap
             errorBundlePretty
-            (fmap concat . mapM compileStatement)
+            compileProgram
             $ parse (statements <* eof) "NCompiler" s
    in case res of
         Left e -> showText e
@@ -53,6 +53,18 @@ compile :: Compiler a -> Either Error a
 compile = flip evalState start . runExceptT
   where
     start = CompilerState {recordNumber = 0, variables = Map.empty}
+
+compileProgram :: [Statement] -> Compiler [Text]
+compileProgram stmts = do
+  body <- concat <$> mapM compileStatement stmts
+  let formatVar (name, var) =
+        "H"
+          <> Text.justifyRight 3 '0' (showText $ address var)
+          <> "   = +000000.0000   ( "
+          <> Text.justifyLeft 43 ' ' name
+          <> " )"
+  vars <- gets variables
+  pure $ map formatVar (Map.toList vars) <> body
 
 compileStatement :: Statement -> Compiler [Text]
 compileStatement stmt = do
@@ -78,11 +90,12 @@ compileStatement stmt = do
       concat
         <$> sequence
           [ pure ["IF " <> e <> " (," <> showText rnElse <> ")"],
-            (concat <$> mapM compileStatement thens),
+            compileStatement thens,
             pure ["JUMP" <> showText rnEnd, "N" <> showText rnElse],
-            (concat <$> mapM compileStatement elses),
+            compileStatement elses,
             pure ["N" <> showText rnEnd]
           ]
+    Stmt.Scope stmts -> (fmap ("  " <>) . concat) <$> mapM compileStatement stmts
 
 compileExpression :: (MonadError Error m) => Map Name Variable -> Expression -> m (Type, Text)
 compileExpression vars expr = case expr of
