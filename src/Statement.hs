@@ -9,13 +9,10 @@ import Code (Code)
 import qualified Code
 import Compiler
 import Control.Monad (void, when)
-import Data.Foldable (toList)
 import Data.Text (Text)
-import qualified Data.Text as Text
 import Expression (Expr, Name)
 import qualified Expression as Expr
 import Parser
-import qualified Type
 
 data Statement
   = Assign Name Expr
@@ -82,10 +79,4 @@ compile stmt = do
             pure ["N" <> showText rnEnd]
           ]
     Scope stmts -> (fmap ("  " <>) . concat) <$> mapM compile stmts
-    Code c -> case c of
-      Code.G00 xs -> do
-        let f (a, expr) = do
-              (t, e) <- Expr.compile expr
-              if t == Type.Real then pure $ showText a <> e else throwError $ Error
-        as <- mapM f $ toList xs
-        pure $ pure $ "G00 " <> Text.intercalate " " as
+    Code c -> Code.compile c
