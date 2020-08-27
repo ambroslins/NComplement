@@ -1,6 +1,7 @@
 module Main where
 
+import qualified Data.Text.IO as Text
+import Program
 
 main :: IO ()
-main = putStrLn "not implemented"
-
+main = Text.interact compile
