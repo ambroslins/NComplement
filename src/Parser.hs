@@ -13,6 +13,7 @@ module Parser
     comma,
     Text,
     try,
+    sepBy,
     sepEndBy,
     many,
     choice,

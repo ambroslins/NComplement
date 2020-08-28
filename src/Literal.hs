@@ -1,5 +1,11 @@
-module Literal (Literal (..), typeOf) where
+module Literal
+  ( Literal (..),
+    parser,
+    typeOf,
+  )
+where
 
+import Parser
 import Type (Type)
 import qualified Type
 
@@ -20,3 +26,12 @@ typeOf = \case
   Bool _ -> Type.Bool
   Integer _ -> Type.Integer
   Real _ -> Type.Real
+
+parser :: Parser Literal
+parser =
+  choice
+    [ Bool True <$ symbol "True",
+      Bool False <$ symbol "False",
+      Real <$> try real,
+      Integer <$> integer
+    ]

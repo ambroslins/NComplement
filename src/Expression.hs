@@ -23,6 +23,7 @@ data Expr
   = Lit Literal
   | Var Name
   | Ref Name
+  | Fun Name [Expr]
   | Neg Expr
   | Add Expr Expr
   | Sub Expr Expr
@@ -35,15 +36,10 @@ parser =
   makeExprParser term table <?> "expression"
 
 term :: Parser Expr
-term = parens parser <|> literal <|> reference <|> variabel
+term = parens parser <|> literal <|> function <|> reference <|> variabel
   where
-    literal =
-      Lit
-        <$> ( Lit.Bool True <$ symbol "True"
-                <|> Lit.Bool False <$ symbol "False"
-                <|> Lit.Real <$> try real
-                <|> Lit.Integer <$> integer
-            )
+    literal = Lit <$> Lit.parser
+    function = try $ Fun <$> identifier <*> parens (sepBy parser comma)
     reference = char '&' >> Ref <$> identifier
     variabel = Var <$> identifier
 
@@ -72,6 +68,11 @@ compile expr = case expr of
   Ref name -> do
     var <- lookupVar name
     pure (type' var, showText $ address var)
+  Fun name args ->
+    maybe
+      (throwError $ NotInScope name)
+      ($ args)
+      $ lookup name functions
   Neg x -> do
     (t, e) <- compile x
     case t of
@@ -87,7 +88,7 @@ compile expr = case expr of
       (Type.Integer, Type.Integer) -> pure (Type.Integer, formatInfix ex ey "*")
       (Type.Integer, Type.Real) -> pure (Type.Real, formatInfix ex ey "*")
       (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix ex ey "*")
-      (Type.Real, Type.Real) -> pure (Type.Real, inSquare $ ex <> "*" <> ey <> "/1.")
+      (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "*" <> ey <> "/1.")
       _ -> throwError Error
   Div x y -> do
     (tx, ex) <- compile x
@@ -95,7 +96,7 @@ compile expr = case expr of
     case (tx, ty) of
       (Type.Integer, Type.Integer) -> pure (Type.Integer, formatInfix ex ey "/")
       (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix ex ey "/")
-      (Type.Real, Type.Real) -> pure (Type.Real, inSquare $ ex <> "/" <> ey <> "*1.")
+      (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
       _ -> throwError Error
   where
     additive x y s = do
@@ -106,5 +107,27 @@ compile expr = case expr of
         (Type.Real, Type.Real) -> pure Type.Real
         _ -> throwError $ Error
       pure (t, formatInfix ex ey s)
-    formatInfix x y s = inSquare $ x <> s <> y
-    inSquare s = "[" <> s <> "]"
+    formatInfix x y s = squareBrackets $ x <> s <> y
+
+squareBrackets :: Text -> Text
+squareBrackets x = "[" <> x <> "]"
+
+functions :: [(Name, [Expr] -> Compiler (Type, Text))]
+functions =
+  [ ("sin", included "SIN"),
+    ("cos", included "COS"),
+    ("tan", included "TAN"),
+    ("asin", included "ASIN"),
+    ("acos", included "ACOS"),
+    ("atan", included "ATAN"),
+    ("sqrt", included "SQRT"),
+    ("round", included "ROUND")
+  ]
+  where
+    included f = \case
+      [x] -> do
+        (t, e) <- compile x
+        case t of
+          Type.Real -> pure $ (Type.Real, f <> squareBrackets e)
+          _ -> throwError $ Error
+      _ -> throwError $ Error

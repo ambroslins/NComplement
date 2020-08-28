@@ -31,4 +31,4 @@ compile (G00 as) = do
     if t == Type.Real
       then pure $ showText a <> e
       else throwError Error
-  pure $ pure $ "G00" <> Text.intercalate " " as'
+  pure $ pure $ "G00 " <> Text.intercalate " " as'
