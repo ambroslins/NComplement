@@ -60,10 +60,10 @@ identifier = lexeme $ do
 reserved :: Text -> Parser ()
 reserved x = lexeme $ string x >> notFollowedBy (alphaNumChar <|> char '_')
 
-natural :: Parser Integer
+natural :: (Integral a, Num a) => Parser a
 natural = lexeme Lexer.decimal
 
-integer :: Parser Integer
+integer :: (Integral a, Num a) => Parser a
 integer = lexeme $ Lexer.signed empty natural
 
 real :: Parser Double

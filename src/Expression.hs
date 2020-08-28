@@ -29,6 +29,7 @@ data Expr
   | Sub Expr Expr
   | Mul Expr Expr
   | Div Expr Expr
+  | Pow Int Expr
   deriving (Eq, Show)
 
 parser :: Parser Expr
@@ -36,18 +37,26 @@ parser =
   makeExprParser term table <?> "expression"
 
 term :: Parser Expr
-term = parens parser <|> literal <|> function <|> reference <|> variabel
+term =
+  choice
+    [ parens parser,
+      function,
+      reference,
+      variabel,
+      literal
+    ]
   where
-    literal = Lit <$> Lit.parser
     function = try $ Fun <$> identifier <*> parens (sepBy parser comma)
     reference = char '&' >> Ref <$> identifier
     variabel = Var <$> identifier
+    literal = Lit <$> Lit.parser
 
 table :: [[Operator Parser Expr]]
 table =
   [ [ prefix "-" Neg,
       prefix "+" id
     ],
+    [Postfix (Pow <$> (symbol "^" *> natural))],
     [ infixLeft "*" (Mul),
       infixLeft "/" (Div)
     ],
@@ -98,6 +107,7 @@ compile expr = case expr of
       (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix ex ey "/")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
       _ -> throwError Error
+  Pow n x -> compile $ foldr Mul (Lit $ Lit.Integer 1) $ replicate n x
   where
     additive x y s = do
       (tx, ex) <- compile x
