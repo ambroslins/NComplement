@@ -10,6 +10,7 @@ where
 
 import Compiler
 import Control.Monad.Combinators.Expr
+import Data.List.NonEmpty (nonEmpty)
 import Data.Text (Text)
 import Literal (Literal (..))
 import qualified Literal as Lit
@@ -107,7 +108,12 @@ compile expr = case expr of
       (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix ex ey "/")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
       _ -> throwError Error
-  Pow n x -> compile $ foldr Mul (Lit $ Lit.Integer 1) $ replicate n x
+  Pow n x ->
+    compile $
+      maybe
+        (Lit $ Lit.Integer 1)
+        (foldr1 Mul)
+        $ nonEmpty $ replicate n x
   where
     additive x y s = do
       (tx, ex) <- compile x
