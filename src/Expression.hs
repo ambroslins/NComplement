@@ -10,7 +10,6 @@ where
 
 import Compiler
 import Control.Monad.Combinators.Expr
-import Data.List.NonEmpty (nonEmpty)
 import Data.Text (Text)
 import Literal (Literal (..))
 import qualified Literal as Lit
@@ -108,12 +107,9 @@ compile expr = case expr of
       (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix ex ey "/")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
       _ -> throwError Error
-  Pow n x ->
-    compile $
-      maybe
-        (Lit $ Lit.Integer 1)
-        (foldr1 Mul)
-        $ nonEmpty $ replicate n x
+  Pow n e -> compile $ case replicate n e of
+    [] -> Lit $ Lit.Integer 1
+    x : xs -> foldr Mul x xs
   where
     additive x y s = do
       (tx, ex) <- compile x
@@ -137,7 +133,12 @@ functions =
     ("acos", included "ACOS"),
     ("atan", included "ATAN"),
     ("sqrt", included "SQRT"),
-    ("round", included "ROUND")
+    ("round", included "ROUND"),
+    ( "norm",
+      \xs -> case map (Pow 2) xs of
+        [] -> throwError $ Error
+        x : xs' -> compile $ Fun "sqrt" $ [foldl Add x xs']
+    )
   ]
   where
     included f = \case
