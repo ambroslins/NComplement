@@ -4,6 +4,8 @@ module Expression
     Literal (..),
     compile,
     parser,
+    parseVar,
+    parseRef,
     Variable (..),
   )
 where
@@ -41,15 +43,19 @@ term =
   choice
     [ parens parser,
       function,
-      reference,
-      variabel,
+      parseRef,
+      parseVar,
       literal
     ]
   where
     function = try $ Fun <$> identifier <*> parens (sepBy parser comma)
-    reference = char '&' >> Ref <$> identifier
-    variabel = Var <$> identifier
     literal = Lit <$> Lit.parser
+
+parseVar :: Parser Expr
+parseVar = Var <$> identifier
+
+parseRef :: Parser Expr
+parseRef = char '&' >> Ref <$> identifier
 
 table :: [[Operator Parser Expr]]
 table =

@@ -9,16 +9,18 @@ import Code (Code)
 import qualified Code
 import Compiler
 import Control.Monad (void, when)
-import Data.Text (Text)
+import qualified Data.Text as Text
 import Expression (Expr, Name)
 import qualified Expression as Expr
 import Parser
+import Replace.Megaparsec (splitCap)
 
 data Statement
   = Assign Name Expr
   | If (Expr, Comperator, Expr) Statement Statement
   | Scope [Statement]
   | Code Code
+  | Unsafe Text
   deriving (Eq, Show)
 
 data Comperator
@@ -39,7 +41,7 @@ parser = sepEndBy parseStmt sep
     sep = lexeme (void semicolon <|> void newline) >> many (lexeme newline)
 
 parseStmt :: Parser Statement
-parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser]
+parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser, unsafe]
   where
     ifStatement = do
       reserved "If"
@@ -56,6 +58,7 @@ parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser]
       pure $ Assign var e
     scope = Scope <$> braces parser
     parseComp = choice [Eq <$ symbol "=", Lt <$ symbol "<", Gt <$ symbol ">"]
+    unsafe = Unsafe . Text.pack <$> (symbol "!" *> manyTill charLiteral (lookAhead (void semicolon <|> void newline)))
 
 compile :: Statement -> Compiler [Text]
 compile stmt = do
@@ -80,3 +83,8 @@ compile stmt = do
           ]
     Scope stmts -> (fmap ("  " <>) . concat) <$> mapM compile stmts
     Code c -> Code.compile c
+    Unsafe x ->
+      fmap (pure . Text.concat) $
+        mapM
+          (either pure (fmap snd . Expr.compile))
+          $ splitCap (Expr.parseRef <|> Expr.parseVar) x
