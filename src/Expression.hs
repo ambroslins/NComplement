@@ -12,7 +12,6 @@ where
 
 import Compiler
 import Control.Monad.Combinators.Expr
-import Data.Text (Text)
 import Literal (Literal (..))
 import qualified Literal as Lit
 import Parser
@@ -62,7 +61,8 @@ table =
   [ [ prefix "-" Neg,
       prefix "+" id
     ],
-    [Postfix (Pow <$> (symbol "^" *> natural))],
+    [ Postfix (Pow <$> (symbol "^" *> integer))
+    ],
     [ infixLeft "*" (Mul),
       infixLeft "/" (Div)
     ],
@@ -91,7 +91,7 @@ compile expr = case expr of
   Neg x -> do
     (t, e) <- compile x
     case t of
-      Type.Integer -> pure (Type.Integer, "-" <> showText e)
+      Type.Integer -> pure (Type.Integer, "-" <> e)
       Type.Real -> pure (Type.Real, "-" <> e)
       _ -> throwError $ Error
   Add x y -> additive x y "+"
@@ -113,9 +113,15 @@ compile expr = case expr of
       (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix ex ey "/")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
       _ -> throwError Error
-  Pow n e -> compile $ case replicate n e of
-    [] -> Lit $ Lit.Integer 1
-    x : xs -> foldr Mul x xs
+  Pow n e ->
+    compile $
+      ( if n < 0
+          then Div (Lit $ Lit.Real 1.0)
+          else id
+      )
+        $ case replicate (abs n) e of
+          [] -> Lit $ Lit.Integer 1
+          x : xs -> foldr Mul x xs
   where
     additive x y s = do
       (tx, ex) <- compile x

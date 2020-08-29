@@ -67,7 +67,7 @@ natural :: (Integral a, Num a) => Parser a
 natural = lexeme Lexer.decimal
 
 integer :: (Integral a, Num a) => Parser a
-integer = lexeme $ Lexer.signed empty natural
+integer = lexeme $ Lexer.signed sc natural
 
 real :: Parser Double
 real = lexeme Lexer.float
