@@ -2,6 +2,7 @@ module Compiler
   ( Compiler,
     Variable (..),
     Error (..),
+    Name,
     runCompiler,
     throwError,
     showText,

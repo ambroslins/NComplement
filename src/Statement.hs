@@ -10,7 +10,7 @@ import qualified Code
 import Compiler
 import Control.Monad (void, when)
 import qualified Data.Text as Text
-import Expression (Expr, Name)
+import Expression (Expr)
 import qualified Expression as Expr
 import Parser
 import Replace.Megaparsec (splitCap)

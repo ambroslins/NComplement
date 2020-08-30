@@ -1,12 +1,10 @@
 module Expression
-  ( Name,
-    Expr (..),
+  ( Expr (..),
     Literal (..),
     compile,
     parser,
     parseVar,
     parseRef,
-    Variable (..),
   )
 where
 
@@ -17,8 +15,6 @@ import qualified Literal as Lit
 import Parser
 import Type (Type)
 import qualified Type
-
-type Name = Text
 
 data Expr
   = Lit Literal

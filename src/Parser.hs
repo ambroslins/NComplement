@@ -21,6 +21,7 @@ module Parser
     choice,
     Lexer.charLiteral,
     option,
+    optional,
     char,
     newline,
     (<|>),
