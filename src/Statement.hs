@@ -7,11 +7,12 @@ where
 
 import Code (Code)
 import qualified Code
-import Generator
-import Control.Monad (void, when)
+import Control.Monad (when)
 import qualified Data.Text as Text
+import Error
 import Expression (Expr)
 import qualified Expression as Expr
+import Generator
 import Parser
 import Replace.Megaparsec (splitCap)
 
@@ -38,7 +39,7 @@ instance Show Comperator where
 parser :: Parser [Statement]
 parser = sepEndBy parseStmt sep
   where
-    sep = lexeme (void semicolon <|> void newline) >> many (lexeme newline)
+    sep = some $ lexeme (semicolon <|> eol)
 
 parseStmt :: Parser Statement
 parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser, unsafe]
@@ -58,14 +59,14 @@ parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser, unsafe
       pure $ Assign var e
     scope = Scope <$> braces parser
     parseComp = choice [Eq <$ symbol "=", Lt <$ symbol "<", Gt <$ symbol ">"]
-    unsafe = Unsafe . Text.pack <$> (symbol "!" *> manyTill charLiteral (lookAhead (void semicolon <|> void newline)))
+    unsafe = Unsafe . Text.pack <$> (symbol "!" *> manyTill charLiteral (lookAhead (semicolon <|> eol)))
 
-generate :: Statement -> Generator [Text]
+generate :: Statement -> Gen [Text]
 generate stmt = do
   case stmt of
     Assign name expr -> do
       (t, e) <- Expr.generate expr
-      var <- insertVar name t
+      var <- addVar name t
       pure $ ["H" <> showText (address var) <> " = " <> e]
     If (lhs, comp, rhs) thens elses -> do
       (tl, el) <- Expr.generate lhs

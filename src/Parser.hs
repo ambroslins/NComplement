@@ -23,7 +23,7 @@ module Parser
     option,
     optional,
     char,
-    newline,
+    eol,
     (<|>),
     (<?>),
     NonEmpty.some,
@@ -79,7 +79,7 @@ parens = between (symbol "(") (symbol ")")
 braces :: Parser a -> Parser a
 braces = between (symbol "{" <* nl) (nl *> symbol "}")
   where
-    nl = lexeme $ optional newline
+    nl = lexeme $ optional eol
 
 semicolon :: Parser Text
 semicolon = symbol ";"

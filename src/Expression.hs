@@ -10,14 +10,14 @@ where
 import Control.Monad.Combinators.Expr
 import Error
 import Generator
+import Literal (Literal)
+import qualified Literal as Lit
 import Parser
 import Type (Type)
 import qualified Type
 
 data Expr
-  = Real Double
-  | Bool Bool
-  | Int Int
+  = Lit Literal
   | Var Name
   | Ref Name
   | Fun Name [Expr]
@@ -40,17 +40,10 @@ term =
       function,
       parseRef,
       parseVar,
-      literal
+      Lit <$> Lit.parser
     ]
   where
     function = try $ Fun <$> identifier <*> parens (sepBy parser comma)
-    literal =
-      choice
-        [ Bool True <$ symbol "True",
-          Bool False <$ symbol "False",
-          Real <$> try real,
-          Int <$> integer
-        ]
 
 parseVar :: Parser Expr
 parseVar = Var <$> identifier
@@ -78,9 +71,7 @@ table =
 
 generate :: Expr -> Gen (Type, Text)
 generate expr = case expr of
-  Real x -> pure (Type.Real, showText x)
-  Bool x -> pure (Type.Bool, if x then "1" else "0")
-  Int x -> pure (Type.Int, showText x)
+  Lit x -> pure (Lit.type' x, showText x)
   Var name -> do
     var <- getVar name
     pure (type' var, "H" <> (showText $ address var))
@@ -120,11 +111,11 @@ generate expr = case expr of
   Pow n e ->
     generate $
       ( if n < 0
-          then Div (Real 1.0)
+          then Div (Lit $ Lit.Real 1.0)
           else id
       )
         $ case replicate (abs n) e of
-          [] -> Int 1
+          [] -> Lit $ Lit.Int 1
           x : xs -> foldr Mul x xs
   where
     additive x y s = do

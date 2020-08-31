@@ -1,11 +1,10 @@
 module Program where
 
-import Compiler
 import Control.Monad.Except
 import Data.Maybe (fromMaybe)
-import Data.Text (Text)
 import qualified Data.Text as Text
-import Expression (Expr)
+import Error
+import Generator
 import Literal (Literal)
 import qualified Literal as Lit
 import Parser
@@ -33,11 +32,11 @@ compile :: Text -> Text
 compile x = either showText (Text.unlines . fmap (<> ";")) $
   runExcept $ do
     ast <- withExcept ParseError $ liftEither $ parse (Stmt.parser <* eof) "NC" x
-    liftEither $ runCompiler $ concat <$> mapM Stmt.compile ast
+    liftEither $ runGenerator emptyEnv $ concat <$> mapM Stmt.generate ast
 
 arguments :: Parser [(Name, Argument)]
-arguments = do
-  symbol "Args"
+arguments = option [] $ do
+  reserved "Args"
   parens $ sepBy arg comma
   where
     arg = do
@@ -45,5 +44,5 @@ arguments = do
       t <- optional $ symbol ":" *> Type.parser
       value <- optional $ symbol "=" *> Lit.parser
       desc <- optional $ Text.pack <$> parens (manyTill charLiteral (lookAhead (symbol ")")))
-      let t' = fromMaybe Type.Real $ t <|> fmap Lit.typeOf value
+      let t' = fromMaybe Type.Real $ t <|> fmap Lit.type' value
       pure (n, Argument {argType = t', defaultValue = value, description = desc})

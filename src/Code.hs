@@ -2,7 +2,7 @@ module Code where
 
 import Code.G (G)
 import qualified Code.G as G
-import Compiler
+import Generator
 import Parser
 
 data Code
@@ -12,5 +12,5 @@ data Code
 parser :: Parser Code
 parser = G <$> G.parser
 
-compile :: Code -> Compiler [Text]
-compile (G g) = G.compile g
+generate :: Code -> Gen [Text]
+generate (G g) = G.generate g

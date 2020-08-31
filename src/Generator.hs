@@ -2,6 +2,7 @@ module Generator
   ( Gen,
     Variable (..),
     Name,
+    runGenerator,
     emptyEnv,
     throwError,
     showText,
@@ -53,6 +54,9 @@ data Variable = Variable
   { address :: Address,
     type' :: Type
   }
+
+runGenerator :: Env -> Gen a -> Either Error a
+runGenerator env = runExcept . flip evalStateT env
 
 emptyEnv :: Env
 emptyEnv =
