@@ -1,13 +1,13 @@
 module Statement
   ( Statement (..),
     parser,
-    compile,
+    generate,
   )
 where
 
 import Code (Code)
 import qualified Code
-import Compiler
+import Generator
 import Control.Monad (void, when)
 import qualified Data.Text as Text
 import Expression (Expr)
@@ -60,31 +60,31 @@ parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser, unsafe
     parseComp = choice [Eq <$ symbol "=", Lt <$ symbol "<", Gt <$ symbol ">"]
     unsafe = Unsafe . Text.pack <$> (symbol "!" *> manyTill charLiteral (lookAhead (void semicolon <|> void newline)))
 
-compile :: Statement -> Compiler [Text]
-compile stmt = do
+generate :: Statement -> Generator [Text]
+generate stmt = do
   case stmt of
     Assign name expr -> do
-      (t, e) <- Expr.compile expr
+      (t, e) <- Expr.generate expr
       var <- insertVar name t
       pure $ ["H" <> showText (address var) <> " = " <> e]
     If (lhs, comp, rhs) thens elses -> do
-      (tl, el) <- Expr.compile lhs
-      (tr, er) <- Expr.compile rhs
+      (tl, el) <- Expr.generate lhs
+      (tr, er) <- Expr.generate rhs
       when (tl /= tr) $ throwError $ Error
       rnElse <- nextRecordNumber
       rnEnd <- nextRecordNumber
       concat
         <$> sequence
           [ pure ["IF " <> el <> showText comp <> er <> " (," <> showText rnElse <> ")"],
-            compile thens,
+            generate thens,
             pure ["JUMP" <> showText rnEnd, "N" <> showText rnElse],
-            compile elses,
+            generate elses,
             pure ["N" <> showText rnEnd]
           ]
-    Scope stmts -> (fmap ("  " <>) . concat) <$> mapM compile stmts
-    Code c -> Code.compile c
+    Scope stmts -> (fmap ("  " <>) . concat) <$> mapM generate stmts
+    Code c -> Code.generate c
     Unsafe x ->
       fmap (pure . Text.concat) $
         mapM
-          (either pure (fmap snd . Expr.compile))
+          (either pure (fmap snd . Expr.generate))
           $ splitCap (Expr.parseRef <|> Expr.parseVar) x

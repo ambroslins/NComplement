@@ -1,23 +1,23 @@
 module Expression
   ( Expr (..),
-    Literal (..),
-    compile,
+    generate,
     parser,
     parseVar,
     parseRef,
   )
 where
 
-import Compiler
 import Control.Monad.Combinators.Expr
-import Literal (Literal (..))
-import qualified Literal as Lit
+import Error
+import Generator
 import Parser
 import Type (Type)
 import qualified Type
 
 data Expr
-  = Lit Literal
+  = Real Double
+  | Bool Bool
+  | Int Int
   | Var Name
   | Ref Name
   | Fun Name [Expr]
@@ -44,7 +44,13 @@ term =
     ]
   where
     function = try $ Fun <$> identifier <*> parens (sepBy parser comma)
-    literal = Lit <$> Lit.parser
+    literal =
+      choice
+        [ Bool True <$ symbol "True",
+          Bool False <$ symbol "False",
+          Real <$> try real,
+          Int <$> integer
+        ]
 
 parseVar :: Parser Expr
 parseVar = Var <$> identifier
@@ -70,14 +76,16 @@ table =
     prefix name f = Prefix (f <$ symbol name)
     infixLeft name f = InfixL (f <$ symbol name)
 
-compile :: Expr -> Compiler (Type, Text)
-compile expr = case expr of
-  Lit lit -> pure (Lit.typeOf lit, showText lit)
+generate :: Expr -> Gen (Type, Text)
+generate expr = case expr of
+  Real x -> pure (Type.Real, showText x)
+  Bool x -> pure (Type.Bool, if x then "1" else "0")
+  Int x -> pure (Type.Int, showText x)
   Var name -> do
-    var <- lookupVar name
+    var <- getVar name
     pure (type' var, "H" <> (showText $ address var))
   Ref name -> do
-    var <- lookupVar name
+    var <- getVar name
     pure (type' var, showText $ address var)
   Fun name args ->
     maybe
@@ -85,45 +93,45 @@ compile expr = case expr of
       ($ args)
       $ lookup name functions
   Neg x -> do
-    (t, e) <- compile x
+    (t, e) <- generate x
     case t of
-      Type.Integer -> pure (Type.Integer, "-" <> e)
+      Type.Int -> pure (Type.Int, "-" <> e)
       Type.Real -> pure (Type.Real, "-" <> e)
       _ -> throwError $ Error
   Add x y -> additive x y "+"
   Sub x y -> additive x y "-"
   Mul x y -> do
-    (tx, ex) <- compile x
-    (ty, ey) <- compile y
+    (tx, ex) <- generate x
+    (ty, ey) <- generate y
     case (tx, ty) of
-      (Type.Integer, Type.Integer) -> pure (Type.Integer, formatInfix ex ey "*")
-      (Type.Integer, Type.Real) -> pure (Type.Real, formatInfix ex ey "*")
-      (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix ex ey "*")
+      (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "*")
+      (Type.Int, Type.Real) -> pure (Type.Real, formatInfix ex ey "*")
+      (Type.Real, Type.Int) -> pure (Type.Real, formatInfix ex ey "*")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "*" <> ey <> "/1.")
       _ -> throwError Error
   Div x y -> do
-    (tx, ex) <- compile x
-    (ty, ey) <- compile y
+    (tx, ex) <- generate x
+    (ty, ey) <- generate y
     case (tx, ty) of
-      (Type.Integer, Type.Integer) -> pure (Type.Integer, formatInfix ex ey "/")
-      (Type.Real, Type.Integer) -> pure (Type.Real, formatInfix ex ey "/")
+      (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "/")
+      (Type.Real, Type.Int) -> pure (Type.Real, formatInfix ex ey "/")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
       _ -> throwError Error
   Pow n e ->
-    compile $
+    generate $
       ( if n < 0
-          then Div (Lit $ Lit.Real 1.0)
+          then Div (Real 1.0)
           else id
       )
         $ case replicate (abs n) e of
-          [] -> Lit $ Lit.Integer 1
+          [] -> Int 1
           x : xs -> foldr Mul x xs
   where
     additive x y s = do
-      (tx, ex) <- compile x
-      (ty, ey) <- compile y
+      (tx, ex) <- generate x
+      (ty, ey) <- generate y
       t <- case (tx, ty) of
-        (Type.Integer, Type.Integer) -> pure Type.Integer
+        (Type.Int, Type.Int) -> pure Type.Int
         (Type.Real, Type.Real) -> pure Type.Real
         _ -> throwError $ Error
       pure (t, formatInfix ex ey s)
@@ -132,7 +140,7 @@ compile expr = case expr of
 squareBrackets :: Text -> Text
 squareBrackets x = "[" <> x <> "]"
 
-functions :: [(Name, [Expr] -> Compiler (Type, Text))]
+functions :: [(Name, [Expr] -> Gen (Type, Text))]
 functions =
   [ ("sin", included "SIN"),
     ("cos", included "COS"),
@@ -145,13 +153,13 @@ functions =
     ( "norm",
       \xs -> case map (Pow 2) xs of
         [] -> throwError $ Error
-        x : xs' -> compile $ Fun "sqrt" $ [foldl Add x xs']
+        x : xs' -> generate $ Fun "sqrt" $ [foldl Add x xs']
     )
   ]
   where
     included f = \case
       [x] -> do
-        (t, e) <- compile x
+        (t, e) <- generate x
         case t of
           Type.Real -> pure $ (Type.Real, f <> squareBrackets e)
           _ -> throwError $ Error

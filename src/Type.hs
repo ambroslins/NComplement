@@ -8,7 +8,7 @@ import Parser
 
 data Type
   = Bool
-  | Integer
+  | Int
   | Real
   deriving (Eq, Show)
 
@@ -16,6 +16,6 @@ parser :: Parser Type
 parser =
   choice
     [ Bool <$ symbol "Bool",
-      Integer <$ symbol "Integer",
+      Int <$ symbol "Integer",
       Real <$ symbol "Real"
     ]
