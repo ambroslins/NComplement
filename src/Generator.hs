@@ -4,6 +4,8 @@ module Generator
     Name,
     runGenerator,
     emptyEnv,
+    emit,
+    emits,
     throwError,
     showText,
     addVar,
@@ -16,7 +18,8 @@ module Generator
 where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.Tardis
+import Control.Monad.Writer
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -24,7 +27,7 @@ import qualified Data.Text as Text
 import Error
 import Type (Type)
 
-type Gen = StateT Env (Except Error)
+type Gen = WriterT [Either Error Text] (ExceptT Error (Tardis Env Env))
 
 showText :: Show a => a -> Text
 showText = Text.pack . show
@@ -55,8 +58,12 @@ data Variable = Variable
     type' :: Type
   }
 
-runGenerator :: Env -> Gen a -> Either Error a
-runGenerator env = runExcept . flip evalStateT env
+runGenerator :: Env -> Gen a -> Either Error [Text]
+runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT
+  where
+    foldEither [] = Right []
+    foldEither (Left x : _) = Left x
+    foldEither (Right x : xs) = (x :) <$> foldEither xs
 
 emptyEnv :: Env
 emptyEnv =
@@ -105,3 +112,15 @@ addLabel n = do
 
 getLabel :: Name -> Gen RecordNumber
 getLabel n = gets labels >>= maybe (throwError Error) pure . Map.lookup n
+
+emit :: Text -> Gen ()
+emit = tell . pure . pure
+
+emits :: [Text] -> Gen ()
+emits = mapM_ emit
+
+gets :: (Env -> a) -> Gen a
+gets = lift . lift . getsPast
+
+modify :: (Env -> Env) -> Gen ()
+modify = lift . lift . modifyForwards

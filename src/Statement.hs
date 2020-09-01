@@ -61,31 +61,29 @@ parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser, unsafe
     parseComp = choice [Eq <$ symbol "=", Lt <$ symbol "<", Gt <$ symbol ">"]
     unsafe = Unsafe . Text.pack <$> (symbol "!" *> manyTill charLiteral (lookAhead (semicolon <|> eol)))
 
-generate :: Statement -> Gen [Text]
+generate :: Statement -> Gen ()
 generate stmt = do
   case stmt of
     Assign name expr -> do
       (t, e) <- Expr.generate expr
       var <- addVar name t
-      pure $ ["H" <> showText (address var) <> " = " <> e]
+      emit $ "H" <> showText (address var) <> " = " <> e
     If (lhs, comp, rhs) thens elses -> do
       (tl, el) <- Expr.generate lhs
       (tr, er) <- Expr.generate rhs
       when (tl /= tr) $ throwError $ Error
       rnElse <- nextRecordNumber
       rnEnd <- nextRecordNumber
-      concat
-        <$> sequence
-          [ pure ["IF " <> el <> showText comp <> er <> " (," <> showText rnElse <> ")"],
-            generate thens,
-            pure ["JUMP" <> showText rnEnd, "N" <> showText rnElse],
-            generate elses,
-            pure ["N" <> showText rnEnd]
-          ]
-    Scope stmts -> (fmap ("  " <>) . concat) <$> mapM generate stmts
+      emit $ "IF " <> el <> showText comp <> er <> " (," <> showText rnElse <> ")"
+      generate thens
+      emits $ ["JUMP" <> showText rnEnd, "N" <> showText rnElse]
+      generate elses
+      emit $ "N" <> showText rnEnd
+    Scope stmts -> mapM_ generate stmts
     Code c -> Code.generate c
-    Unsafe x ->
-      fmap (pure . Text.concat) $
-        mapM
-          (either pure (fmap snd . Expr.generate))
-          $ splitCap (Expr.parseRef <|> Expr.parseVar) x
+    Unsafe x -> do
+      u <-
+        fmap (Text.concat) $
+          mapM (either pure (fmap snd . Expr.generate)) $
+            splitCap (Expr.parseRef <|> Expr.parseVar) x
+      emit u

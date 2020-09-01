@@ -25,11 +25,11 @@ parser = symbol "G00" >> G00 <$> some p
       e <- Expr.parser
       pure (a, e)
 
-generate :: G -> Gen [Text]
+generate :: G -> Gen ()
 generate (G00 as) = do
   as' <- forM (toList as) $ \(a, expr) -> do
     (t, e) <- Expr.generate expr
     if t == Type.Real
       then pure $ showText a <> e
       else throwError Error
-  pure $ pure $ "G00 " <> Text.intercalate " " as'
+  emit $ "G00 " <> Text.intercalate " " as'

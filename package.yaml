@@ -25,6 +25,7 @@ dependencies:
 - parser-combinators
 - replace-megaparsec
 - mtl
+- tardis
 - containers
 - text
 
