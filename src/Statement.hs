@@ -22,6 +22,8 @@ data Statement
   | Scope [Statement]
   | Code Code
   | Unsafe Text
+  | Label Name
+  | Jump Name
   deriving (Eq, Show)
 
 data Comperator
@@ -42,7 +44,16 @@ parser = sepEndBy parseStmt sep
     sep = some $ lexeme (semicolon <|> eol)
 
 parseStmt :: Parser Statement
-parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser, unsafe]
+parseStmt =
+  choice
+    [ ifStatement,
+      try label,
+      assignment,
+      scope,
+      Code <$> Code.parser,
+      unsafe,
+      jump
+    ]
   where
     ifStatement = do
       reserved "If"
@@ -52,6 +63,7 @@ parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser, unsafe
       sThen <- parseStmt
       sElse <- option (Scope []) $ reserved "Else" *> parseStmt
       pure $ If (lhs, comp, rhs) sThen sElse
+    label = Label <$> identifier <* symbol ":"
     assignment = do
       var <- identifier
       reserved "="
@@ -60,6 +72,7 @@ parseStmt = choice [ifStatement, assignment, scope, Code <$> Code.parser, unsafe
     scope = Scope <$> braces parser
     parseComp = choice [Eq <$ symbol "=", Lt <$ symbol "<", Gt <$ symbol ">"]
     unsafe = Unsafe . Text.pack <$> (symbol "!" *> manyTill charLiteral (lookAhead (semicolon <|> eol)))
+    jump = symbol "JUMP" >> Jump <$> identifier
 
 generate :: Statement -> Gen ()
 generate stmt = do
@@ -87,3 +100,7 @@ generate stmt = do
           mapM (either pure (fmap snd . Expr.generate)) $
             splitCap (Expr.parseRef <|> Expr.parseVar) x
       emit u
+    Label name -> do
+      rn <- addLabel name
+      emit $ "N" <> showText rn
+    Jump name -> withLabel name $ maybe (Left $ NotInScope name) (Right . ("JUMP" <>) . showText)

@@ -12,6 +12,7 @@ module Generator
     getVar,
     addLabel,
     getLabel,
+    withLabel,
     nextAddress,
     nextRecordNumber,
   )
@@ -59,11 +60,12 @@ data Variable = Variable
   }
 
 runGenerator :: Env -> Gen a -> Either Error [Text]
-runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT
+runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT . revert
   where
     foldEither [] = Right []
     foldEither (Left x : _) = Left x
     foldEither (Right x : xs) = (x :) <$> foldEither xs
+    revert = (>> (lift $ lift $ getPast >>= sendPast))
 
 emptyEnv :: Env
 emptyEnv =
@@ -124,3 +126,6 @@ gets = lift . lift . getsPast
 
 modify :: (Env -> Env) -> Gen ()
 modify = lift . lift . modifyForwards
+
+withLabel :: Name -> (Maybe RecordNumber -> Either Error Text) -> Gen ()
+withLabel n f = (lift $ lift $ getsFuture labels) >>= tell . pure . f . Map.lookup n
