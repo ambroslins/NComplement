@@ -13,6 +13,7 @@ module Generator
     emit,
     emits,
     emitWithFuture,
+    emitsWithFuture,
     nextAddress,
     nextRecordNumber,
     throwError,
@@ -100,7 +101,10 @@ emits :: [Text] -> Gen ()
 emits = mapM_ emit
 
 emitWithFuture :: (Env -> Either Error Text) -> Gen ()
-emitWithFuture f = (lift $ lift $ getFuture) >>= tell . pure . f
+emitWithFuture = emitsWithFuture . fmap pure
+
+emitsWithFuture :: (Env -> [Either Error Text]) -> Gen ()
+emitsWithFuture f = (lift $ lift $ getFuture) >>= tell . f
 
 nextAddress :: Gen Address
 nextAddress = do
