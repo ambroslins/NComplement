@@ -1,6 +1,7 @@
 module Program where
 
 import Control.Monad.Except
+import Data.List (sortOn)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
@@ -70,7 +71,7 @@ genVars :: [(Name, Argument)] -> Gen ()
 genVars as =
   emitsWithFuture
     ( \env ->
-        let vars = Map.toList $ Map.difference (variables env) $ Map.fromList as
+        let vars = sortOn (address . snd) $ Map.toList $ Map.difference (variables env) $ Map.fromList as
          in flip map vars $ \(name, var) ->
               pure ("H" <> showText (address var) <> "   =  +000000.0000  ( " <> Text.justifyLeft 43 ' ' name <> ")")
     )

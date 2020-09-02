@@ -37,13 +37,13 @@ showText :: Show a => a -> Text
 showText = Text.pack . show
 
 newtype Address = Address Int
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance Show Address where
   show (Address x) = Text.unpack $ Text.justifyRight 3 '0' $ showText x
 
 newtype RecordNumber = RecordNumber Int
-  deriving (Eq)
+  deriving (Eq, Ord)
 
 instance Show RecordNumber where
   show (RecordNumber x) = Text.unpack $ Text.justifyRight 4 '0' $ showText x
