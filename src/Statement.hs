@@ -120,7 +120,7 @@ generate stmt = do
     Jump name ->
       emitWithFuture $
         maybe
-          (Left $ NotInScope name)
+          (Left $ UndefinedLabel name)
           (Right . ("JUMP" <>) . showText)
           . Map.lookup name
           . labels

@@ -74,14 +74,14 @@ eval :: Expr -> Gen (Type, Text)
 eval expr = case expr of
   Lit x -> pure (Lit.type' x, showText x)
   Var name -> do
-    var <- gets variables >>= maybe (throwError $ NotInScope name) pure . Map.lookup name
+    var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
     pure (type' var, "H" <> (showText $ address var))
   Ref name -> do
-    var <- gets variables >>= maybe (throwError $ NotInScope name) pure . Map.lookup name
+    var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
     pure (type' var, showText $ address var)
   Fun name args ->
     maybe
-      (throwError $ NotInScope name)
+      (throwError $ UndefinedFun name)
       ($ args)
       $ lookup name functions
   Neg x -> do
@@ -89,7 +89,7 @@ eval expr = case expr of
     case t of
       Type.Int -> pure (Type.Int, "-" <> e)
       Type.Real -> pure (Type.Real, "-" <> e)
-      _ -> throwError $ Error
+      _ -> throwError $ TypeMismatch t Type.Real
   Add x y -> additive x y "+"
   Sub x y -> additive x y "-"
   Mul x y -> do
@@ -100,7 +100,7 @@ eval expr = case expr of
       (Type.Int, Type.Real) -> pure (Type.Real, formatInfix ex ey "*")
       (Type.Real, Type.Int) -> pure (Type.Real, formatInfix ex ey "*")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "*" <> ey <> "/1.")
-      _ -> throwError Error
+      _ -> throwError $ TypeMismatch tx ty
   Div x y -> do
     (tx, ex) <- eval x
     (ty, ey) <- eval y
@@ -108,7 +108,7 @@ eval expr = case expr of
       (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "/")
       (Type.Real, Type.Int) -> pure (Type.Real, formatInfix ex ey "/")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
-      _ -> throwError Error
+      _ -> throwError $ TypeMismatch tx ty
   Pow n e ->
     eval $
       ( if n < 0
@@ -125,7 +125,7 @@ eval expr = case expr of
       t <- case (tx, ty) of
         (Type.Int, Type.Int) -> pure Type.Int
         (Type.Real, Type.Real) -> pure Type.Real
-        _ -> throwError $ Error
+        _ -> throwError $ TypeMismatch tx ty
       pure (t, formatInfix ex ey s)
     formatInfix x y s = squareBrackets $ x <> s <> y
 
@@ -154,5 +154,5 @@ functions =
         (t, e) <- eval x
         case t of
           Type.Real -> pure $ (Type.Real, f <> squareBrackets e)
-          _ -> throwError $ Error
+          _ -> throwError $ TypeMismatch t Type.Real
       _ -> throwError $ Error
