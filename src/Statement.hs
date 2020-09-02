@@ -8,6 +8,7 @@ where
 import Code (Code)
 import qualified Code
 import Control.Monad (when)
+import qualified Data.Map as Map
 import qualified Data.Text as Text
 import Error
 import Expression (Expr)
@@ -103,4 +104,10 @@ generate stmt = do
     Label name -> do
       rn <- addLabel name
       emit $ "N" <> showText rn
-    Jump name -> withLabel name $ maybe (Left $ NotInScope name) (Right . ("JUMP" <>) . showText)
+    Jump name ->
+      emitWithFuture $
+        maybe
+          (Left $ NotInScope name)
+          (Right . ("JUMP" <>) . showText)
+          . Map.lookup name
+          . labels

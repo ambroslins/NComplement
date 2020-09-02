@@ -1,5 +1,6 @@
 module Generator
   ( Gen,
+    Env (variables, labels),
     Variable (..),
     Name,
     runGenerator,
@@ -12,7 +13,7 @@ module Generator
     getVar,
     addLabel,
     getLabel,
-    withLabel,
+    emitWithFuture,
     nextAddress,
     nextRecordNumber,
   )
@@ -127,5 +128,5 @@ gets = lift . lift . getsPast
 modify :: (Env -> Env) -> Gen ()
 modify = lift . lift . modifyForwards
 
-withLabel :: Name -> (Maybe RecordNumber -> Either Error Text) -> Gen ()
-withLabel n f = (lift $ lift $ getsFuture labels) >>= tell . pure . f . Map.lookup n
+emitWithFuture :: (Env -> Either Error Text) -> Gen ()
+emitWithFuture f = (lift $ lift $ getFuture) >>= tell . pure . f
