@@ -28,7 +28,7 @@ parser = symbol "G00" >> G00 <$> some p
 generate :: G -> Gen ()
 generate (G00 as) = do
   as' <- forM (toList as) $ \(a, expr) -> do
-    (t, e) <- Expr.generate expr
+    (t, e) <- Expr.eval expr
     if t == Type.Real
       then pure $ showText a <> e
       else throwError Error

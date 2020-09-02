@@ -79,12 +79,22 @@ generate :: Statement -> Gen ()
 generate stmt = do
   case stmt of
     Assign name expr -> do
-      (t, e) <- Expr.generate expr
-      var <- addVar name t
+      (t, e) <- Expr.eval expr
+      var <- do
+        vars <- gets variables
+        case Map.lookup name vars of
+          Nothing -> do
+            adr <- nextAddress
+            let v = Variable {address = adr, type' = t}
+            modifyVars $ Map.insert name v
+            pure v
+          Just v -> do
+            when (type' v /= t) $ throwError $ Error
+            pure v
       emit $ "H" <> showText (address var) <> " = " <> e
     If (lhs, comp, rhs) thens elses -> do
-      (tl, el) <- Expr.generate lhs
-      (tr, er) <- Expr.generate rhs
+      (tl, el) <- Expr.eval lhs
+      (tr, er) <- Expr.eval rhs
       when (tl /= tr) $ throwError $ Error
       rnElse <- nextRecordNumber
       rnEnd <- nextRecordNumber
@@ -98,11 +108,14 @@ generate stmt = do
     Unsafe x -> do
       u <-
         fmap (Text.concat) $
-          mapM (either pure (fmap snd . Expr.generate)) $
+          mapM (either pure (fmap snd . Expr.eval)) $
             splitCap (Expr.parseRef <|> Expr.parseVar) x
       emit u
     Label name -> do
-      rn <- addLabel name
+      ls <- gets labels
+      when (Map.member name ls) $ throwError $ Error
+      rn <- nextRecordNumber
+      modifyLabels $ Map.insert name rn
       emit $ "N" <> showText rn
     Jump name ->
       emitWithFuture $

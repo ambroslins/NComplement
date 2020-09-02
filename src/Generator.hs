@@ -5,17 +5,18 @@ module Generator
     Name,
     runGenerator,
     emptyEnv,
+    get,
+    gets,
+    modify,
+    modifyVars,
+    modifyLabels,
     emit,
     emits,
-    throwError,
-    showText,
-    addVar,
-    getVar,
-    addLabel,
-    getLabel,
     emitWithFuture,
     nextAddress,
     nextRecordNumber,
+    throwError,
+    showText,
   )
 where
 
@@ -77,50 +78,8 @@ emptyEnv =
       labels = Map.empty
     }
 
-nextAddress :: Gen Address
-nextAddress = do
-  Address a <- gets offsetAddress
-  modify $ \e -> e {offsetAddress = Address (1 + a)}
-  pure $ Address a
-
-nextRecordNumber :: Gen RecordNumber
-nextRecordNumber = do
-  RecordNumber n <- gets recordNumber
-  modify $ \e -> e {recordNumber = RecordNumber (1 + n)}
-  pure $ RecordNumber n
-
-addVar :: Name -> Type -> Gen Variable
-addVar n t = do
-  vars <- gets variables
-  case Map.lookup n vars of
-    Nothing -> do
-      adr <- nextAddress
-      let var = Variable {type' = t, address = adr}
-      modify (\e -> e {variables = Map.insert n var vars})
-      pure var
-    Just var -> if t == type' var then pure var else throwError $ Error
-
-getVar :: Name -> Gen Variable
-getVar n = gets variables >>= maybe (throwError Error) pure . Map.lookup n
-
-addLabel :: Name -> Gen RecordNumber
-addLabel n = do
-  ls <- gets labels
-  case Map.lookup n ls of
-    Nothing -> do
-      rn <- nextRecordNumber
-      modify $ \e -> e {labels = Map.insert n rn ls}
-      pure rn
-    Just _ -> throwError $ Error
-
-getLabel :: Name -> Gen RecordNumber
-getLabel n = gets labels >>= maybe (throwError Error) pure . Map.lookup n
-
-emit :: Text -> Gen ()
-emit = tell . pure . pure
-
-emits :: [Text] -> Gen ()
-emits = mapM_ emit
+get :: Gen Env
+get = gets id
 
 gets :: (Env -> a) -> Gen a
 gets = lift . lift . getsPast
@@ -128,5 +87,29 @@ gets = lift . lift . getsPast
 modify :: (Env -> Env) -> Gen ()
 modify = lift . lift . modifyForwards
 
+modifyVars :: (Map Name Variable -> Map Name Variable) -> Gen ()
+modifyVars f = modify $ \env -> env {variables = f (variables env)}
+
+modifyLabels :: (Map Name RecordNumber -> Map Name RecordNumber) -> Gen ()
+modifyLabels f = modify $ \env -> env {labels = f (labels env)}
+
+emit :: Text -> Gen ()
+emit = tell . pure . pure
+
+emits :: [Text] -> Gen ()
+emits = mapM_ emit
+
 emitWithFuture :: (Env -> Either Error Text) -> Gen ()
 emitWithFuture f = (lift $ lift $ getFuture) >>= tell . pure . f
+
+nextAddress :: Gen Address
+nextAddress = do
+  Address a <- gets offsetAddress
+  modify $ \env -> env {offsetAddress = Address (1 + a)}
+  pure $ Address a
+
+nextRecordNumber :: Gen RecordNumber
+nextRecordNumber = do
+  RecordNumber n <- gets recordNumber
+  modify $ \env -> env {recordNumber = RecordNumber (1 + n)}
+  pure $ RecordNumber n
