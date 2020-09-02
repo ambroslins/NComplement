@@ -12,5 +12,5 @@ data Code
 parser :: Parser Code
 parser = G <$> G.parser
 
-generate :: Code -> Gen [Text]
+generate :: Code -> Gen ()
 generate (G g) = G.generate g

@@ -1,22 +1,28 @@
 module Generator
   ( Gen,
+    Env (variables, labels),
     Variable (..),
     Name,
     runGenerator,
     emptyEnv,
-    throwError,
-    showText,
-    addVar,
-    getVar,
-    addLabel,
-    getLabel,
+    get,
+    gets,
+    modify,
+    modifyVars,
+    modifyLabels,
+    emit,
+    emits,
+    emitWithFuture,
     nextAddress,
     nextRecordNumber,
+    throwError,
+    showText,
   )
 where
 
 import Control.Monad.Except
-import Control.Monad.State
+import Control.Monad.Tardis
+import Control.Monad.Writer
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -24,7 +30,7 @@ import qualified Data.Text as Text
 import Error
 import Type (Type)
 
-type Gen = StateT Env (Except Error)
+type Gen = WriterT [Either Error Text] (ExceptT Error (Tardis Env Env))
 
 showText :: Show a => a -> Text
 showText = Text.pack . show
@@ -55,8 +61,13 @@ data Variable = Variable
     type' :: Type
   }
 
-runGenerator :: Env -> Gen a -> Either Error a
-runGenerator env = runExcept . flip evalStateT env
+runGenerator :: Env -> Gen a -> Either Error [Text]
+runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT . revert
+  where
+    foldEither [] = Right []
+    foldEither (Left x : _) = Left x
+    foldEither (Right x : xs) = (x :) <$> foldEither xs
+    revert = (>> (lift $ lift $ getPast >>= sendPast))
 
 emptyEnv :: Env
 emptyEnv =
@@ -67,41 +78,38 @@ emptyEnv =
       labels = Map.empty
     }
 
+get :: Gen Env
+get = gets id
+
+gets :: (Env -> a) -> Gen a
+gets = lift . lift . getsPast
+
+modify :: (Env -> Env) -> Gen ()
+modify = lift . lift . modifyForwards
+
+modifyVars :: (Map Name Variable -> Map Name Variable) -> Gen ()
+modifyVars f = modify $ \env -> env {variables = f (variables env)}
+
+modifyLabels :: (Map Name RecordNumber -> Map Name RecordNumber) -> Gen ()
+modifyLabels f = modify $ \env -> env {labels = f (labels env)}
+
+emit :: Text -> Gen ()
+emit = tell . pure . pure
+
+emits :: [Text] -> Gen ()
+emits = mapM_ emit
+
+emitWithFuture :: (Env -> Either Error Text) -> Gen ()
+emitWithFuture f = (lift $ lift $ getFuture) >>= tell . pure . f
+
 nextAddress :: Gen Address
 nextAddress = do
   Address a <- gets offsetAddress
-  modify $ \e -> e {offsetAddress = Address (1 + a)}
+  modify $ \env -> env {offsetAddress = Address (1 + a)}
   pure $ Address a
 
 nextRecordNumber :: Gen RecordNumber
 nextRecordNumber = do
   RecordNumber n <- gets recordNumber
-  modify $ \e -> e {recordNumber = RecordNumber (1 + n)}
+  modify $ \env -> env {recordNumber = RecordNumber (1 + n)}
   pure $ RecordNumber n
-
-addVar :: Name -> Type -> Gen Variable
-addVar n t = do
-  vars <- gets variables
-  case Map.lookup n vars of
-    Nothing -> do
-      adr <- nextAddress
-      let var = Variable {type' = t, address = adr}
-      modify (\e -> e {variables = Map.insert n var vars})
-      pure var
-    Just var -> if t == type' var then pure var else throwError $ Error
-
-getVar :: Name -> Gen Variable
-getVar n = gets variables >>= maybe (throwError Error) pure . Map.lookup n
-
-addLabel :: Name -> Gen RecordNumber
-addLabel n = do
-  ls <- gets labels
-  case Map.lookup n ls of
-    Nothing -> do
-      rn <- nextRecordNumber
-      modify $ \e -> e {labels = Map.insert n rn ls}
-      pure rn
-    Just _ -> throwError $ Error
-
-getLabel :: Name -> Gen RecordNumber
-getLabel n = gets labels >>= maybe (throwError Error) pure . Map.lookup n

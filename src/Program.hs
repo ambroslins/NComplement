@@ -32,7 +32,7 @@ compile :: Text -> Text
 compile x = either showText (Text.unlines . fmap (<> ";")) $
   runExcept $ do
     ast <- withExcept ParseError $ liftEither $ parse (Stmt.parser <* eof) "NC" x
-    liftEither $ runGenerator emptyEnv $ concat <$> mapM Stmt.generate ast
+    liftEither $ runGenerator emptyEnv $ mapM Stmt.generate ast
 
 arguments :: Parser [(Name, Argument)]
 arguments = option [] $ do

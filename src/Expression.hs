@@ -1,6 +1,6 @@
 module Expression
   ( Expr (..),
-    generate,
+    eval,
     parser,
     parseVar,
     parseRef,
@@ -8,6 +8,7 @@ module Expression
 where
 
 import Control.Monad.Combinators.Expr
+import qualified Data.Map as Map
 import Error
 import Generator
 import Literal (Literal)
@@ -69,14 +70,14 @@ table =
     prefix name f = Prefix (f <$ symbol name)
     infixLeft name f = InfixL (f <$ symbol name)
 
-generate :: Expr -> Gen (Type, Text)
-generate expr = case expr of
+eval :: Expr -> Gen (Type, Text)
+eval expr = case expr of
   Lit x -> pure (Lit.type' x, showText x)
   Var name -> do
-    var <- getVar name
+    var <- gets variables >>= maybe (throwError $ NotInScope name) pure . Map.lookup name
     pure (type' var, "H" <> (showText $ address var))
   Ref name -> do
-    var <- getVar name
+    var <- gets variables >>= maybe (throwError $ NotInScope name) pure . Map.lookup name
     pure (type' var, showText $ address var)
   Fun name args ->
     maybe
@@ -84,7 +85,7 @@ generate expr = case expr of
       ($ args)
       $ lookup name functions
   Neg x -> do
-    (t, e) <- generate x
+    (t, e) <- eval x
     case t of
       Type.Int -> pure (Type.Int, "-" <> e)
       Type.Real -> pure (Type.Real, "-" <> e)
@@ -92,8 +93,8 @@ generate expr = case expr of
   Add x y -> additive x y "+"
   Sub x y -> additive x y "-"
   Mul x y -> do
-    (tx, ex) <- generate x
-    (ty, ey) <- generate y
+    (tx, ex) <- eval x
+    (ty, ey) <- eval y
     case (tx, ty) of
       (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "*")
       (Type.Int, Type.Real) -> pure (Type.Real, formatInfix ex ey "*")
@@ -101,15 +102,15 @@ generate expr = case expr of
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "*" <> ey <> "/1.")
       _ -> throwError Error
   Div x y -> do
-    (tx, ex) <- generate x
-    (ty, ey) <- generate y
+    (tx, ex) <- eval x
+    (ty, ey) <- eval y
     case (tx, ty) of
       (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "/")
       (Type.Real, Type.Int) -> pure (Type.Real, formatInfix ex ey "/")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
       _ -> throwError Error
   Pow n e ->
-    generate $
+    eval $
       ( if n < 0
           then Div (Lit $ Lit.Real 1.0)
           else id
@@ -119,8 +120,8 @@ generate expr = case expr of
           x : xs -> foldr Mul x xs
   where
     additive x y s = do
-      (tx, ex) <- generate x
-      (ty, ey) <- generate y
+      (tx, ex) <- eval x
+      (ty, ey) <- eval y
       t <- case (tx, ty) of
         (Type.Int, Type.Int) -> pure Type.Int
         (Type.Real, Type.Real) -> pure Type.Real
@@ -144,13 +145,13 @@ functions =
     ( "norm",
       \xs -> case map (Pow 2) xs of
         [] -> throwError $ Error
-        x : xs' -> generate $ Fun "sqrt" $ [foldl Add x xs']
+        x : xs' -> eval $ Fun "sqrt" $ [foldl Add x xs']
     )
   ]
   where
     included f = \case
       [x] -> do
-        (t, e) <- generate x
+        (t, e) <- eval x
         case t of
           Type.Real -> pure $ (Type.Real, f <> squareBrackets e)
           _ -> throwError $ Error

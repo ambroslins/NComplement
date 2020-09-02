@@ -25,12 +25,12 @@ dependencies:
 - parser-combinators
 - replace-megaparsec
 - mtl
+- tardis
 - containers
 - text
 
 default-extensions:
   - LambdaCase
-  - FlexibleContexts
   - OverloadedStrings
 
 library:
