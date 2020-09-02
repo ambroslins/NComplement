@@ -31,7 +31,6 @@ dependencies:
 
 default-extensions:
   - LambdaCase
-  - FlexibleContexts
   - OverloadedStrings
 
 library:
