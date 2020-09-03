@@ -2,6 +2,8 @@ module Gen
   ( Gen,
     Env (variables, labels),
     Variable (..),
+    Address,
+    RecordNumber,
     runGenerator,
     emptyEnv,
     get,

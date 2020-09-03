@@ -7,6 +7,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
 import Gen
+import Literal (Literal)
 import qualified Literal as Lit
 import qualified Parser
 import Replace.Megaparsec (splitCap)
@@ -14,8 +15,41 @@ import Syntax
 import Type (Type)
 import qualified Type
 
-eval :: Expr -> Gen (Type, Text)
-eval expr = case expr of
+program :: Program -> Gen ()
+program p = do
+  emitsWithFuture $ \env ->
+    map
+      (\(name, var) -> pure $ definition (address var) (Lit.Real 0.0) name)
+      (Map.toList $ variables env)
+  mapM_ statement (body p)
+
+definition :: Address -> Literal -> Text -> Text
+definition adr val desc =
+  "H" <> showText adr
+    <> "   =  "
+    <> sign
+    <> num
+    <> "  ("
+    <> Text.justifyLeft 53 ' ' desc
+    <> ")"
+  where
+    sign = case val of
+      (Lit.Real x) | x < 0.0 -> "-"
+      (Lit.Int x) | x < 0 -> "-"
+      _ -> "+"
+    num = case val of
+      (Lit.Real x) ->
+        let (int, frac) = Text.breakOn "." (showText (abs x))
+         in Text.justifyRight 6 '0' int <> Text.justifyLeft 5 '0' (Text.take 5 frac)
+      (Lit.Int x) ->
+        Text.replicate 6 "0" <> "."
+          <> Text.justifyRight 4 '0' (showText (abs x))
+      (Lit.Bool x) ->
+        Text.replicate 6 "0" <> "."
+          <> Text.justifyRight 4 '0' (showText x)
+
+expr :: Expr -> Gen (Type, Text)
+expr = \case
   Lit x -> pure (Lit.type' x, showText x)
   Var name -> do
     var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
@@ -29,7 +63,7 @@ eval expr = case expr of
       ($ args)
       $ lookup name functions
   Neg x -> do
-    (t, e) <- eval x
+    (t, e) <- expr x
     case t of
       Type.Int -> pure (Type.Int, "-" <> e)
       Type.Real -> pure (Type.Real, "-" <> e)
@@ -37,8 +71,8 @@ eval expr = case expr of
   Add x y -> additive x y "+"
   Sub x y -> additive x y "-"
   Mul x y -> do
-    (tx, ex) <- eval x
-    (ty, ey) <- eval y
+    (tx, ex) <- expr x
+    (ty, ey) <- expr y
     case (tx, ty) of
       (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "*")
       (Type.Int, Type.Real) -> pure (Type.Real, formatInfix ex ey "*")
@@ -46,15 +80,15 @@ eval expr = case expr of
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "*" <> ey <> "/1.")
       _ -> throwError $ TypeMismatch tx ty
   Div x y -> do
-    (tx, ex) <- eval x
-    (ty, ey) <- eval y
+    (tx, ex) <- expr x
+    (ty, ey) <- expr y
     case (tx, ty) of
       (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "/")
       (Type.Real, Type.Int) -> pure (Type.Real, formatInfix ex ey "/")
       (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
       _ -> throwError $ TypeMismatch tx ty
   Pow n e ->
-    eval $
+    expr $
       ( if n < 0
           then Div (Lit $ Lit.Real 1.0)
           else id
@@ -64,8 +98,8 @@ eval expr = case expr of
           x : xs -> foldr Mul x xs
   where
     additive x y s = do
-      (tx, ex) <- eval x
-      (ty, ey) <- eval y
+      (tx, ex) <- expr x
+      (ty, ey) <- expr y
       t <- case (tx, ty) of
         (Type.Int, Type.Int) -> pure Type.Int
         (Type.Real, Type.Real) -> pure Type.Real
@@ -89,23 +123,23 @@ functions =
     ( "norm",
       \xs -> case map (Pow 2) xs of
         [] -> throwError $ Error
-        x : xs' -> eval $ Fun "sqrt" $ [foldl Add x xs']
+        x : xs' -> expr $ Fun "sqrt" $ [foldl Add x xs']
     )
   ]
   where
     included f = \case
       [x] -> do
-        (t, e) <- eval x
+        (t, e) <- expr x
         case t of
           Type.Real -> pure $ (Type.Real, f <> squareBrackets e)
           _ -> throwError $ TypeMismatch t Type.Real
       _ -> throwError $ Error
 
-generate :: Statement -> Gen ()
-generate stmt = do
+statement :: Statement -> Gen ()
+statement stmt = do
   case stmt of
-    Assign name expr -> do
-      (t, e) <- eval expr
+    Assign name x -> do
+      (t, e) <- expr x
       var <- do
         vars <- gets variables
         case Map.lookup name vars of
@@ -119,24 +153,24 @@ generate stmt = do
             pure v
       emit $ "H" <> showText (address var) <> " = " <> e
     If (lhs, comp, rhs) thens melses -> do
-      (tl, el) <- eval lhs
-      (tr, er) <- eval rhs
+      (tl, el) <- expr lhs
+      (tr, er) <- expr rhs
       when (tl /= tr) $ throwError $ Error
       rn1 <- nextRecordNumber
       emit $ "IF " <> el <> showText comp <> er <> " (," <> showText rn1 <> ")"
-      generate thens
+      statement thens
       case melses of
         Nothing -> emit $ "N" <> showText rn1
         Just elses -> do
           rn2 <- nextRecordNumber
           emits $ ["JUMP" <> showText rn2, "N" <> showText rn1]
-          generate elses
+          statement elses
           emit $ "N" <> showText rn2
-    Scope stmts -> mapM_ generate stmts
+    Scope stmts -> mapM_ statement stmts
     Unsafe x -> do
       u <-
         fmap (Text.concat) $
-          mapM (either pure (fmap snd . eval)) $
+          mapM (either pure (fmap snd . expr)) $
             splitCap (Parser.reference <|> Parser.variable) x
       emit u
     Label name -> do

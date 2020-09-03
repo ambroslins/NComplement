@@ -4,6 +4,7 @@ import Control.Monad.Combinators
   ( choice,
     many,
     manyTill,
+    option,
     optional,
     (<|>),
   )
@@ -28,7 +29,7 @@ import Text.Megaparsec.Char
 -- Program
 
 program :: Parser Program
-program = Program <$> args <*> statements
+program = Program <$> option [] args <*> statements
 
 -- Expression
 
@@ -89,7 +90,10 @@ arg = do
   pure (name, desc)
 
 args :: Parser [Argument]
-args = symbol "Args" >> parens (sepBy arg sep) <* some (lexeme eol)
+args =
+  symbol "Args"
+    >> parens (sepBy arg sep)
+    <* some (lexeme (semicolon <|> eol))
   where
     sep = comma >> many (lexeme eol)
 
