@@ -126,7 +126,7 @@ statement =
     label = Label <$> identifier <* symbol ":"
     assignment = do
       var <- identifier
-      reserved "="
+      _ <- symbol "="
       e <- expr
       pure $ Assign var e
     scope = Scope <$> braces statements
