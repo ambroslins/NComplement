@@ -25,6 +25,11 @@ import Text.Megaparsec.Char
     eol,
   )
 
+-- Program
+
+program :: Parser Program
+program = Program <$> args <*> statements
+
 -- Expression
 
 expr :: Parser Expr
@@ -84,7 +89,7 @@ arg = do
   pure (name, desc)
 
 args :: Parser [Argument]
-args = symbol "Args" >> parens (sepBy arg sep)
+args = symbol "Args" >> parens (sepBy arg sep) <* some (lexeme eol)
   where
     sep = comma >> many (lexeme eol)
 
