@@ -8,8 +8,8 @@ type Name = Text
 type Argument = (Name, Maybe Text)
 
 data Program = Program
-  { args :: [Argument],
-    stmts :: [Statement]
+  { arguments :: [Argument],
+    body :: [Statement]
   }
 
 data Expr

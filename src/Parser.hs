@@ -77,14 +77,14 @@ table =
 
 -- Arguments
 
-argument :: Parser Argument
-argument = do
+arg :: Parser Argument
+arg = do
   name <- identifier
   desc <- optional (Text.pack <$> (char '(' >> manyTill charLiteral (char ')')))
   pure (name, desc)
 
-arguments :: Parser [Argument]
-arguments = symbol "Args" >> parens (sepBy argument sep)
+args :: Parser [Argument]
+args = symbol "Args" >> parens (sepBy arg sep)
   where
     sep = comma >> many (lexeme eol)
 
