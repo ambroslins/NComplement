@@ -90,8 +90,8 @@ expr = \case
   Neg x -> do
     (t, e) <- expr x
     case t of
-      Type.Int -> pure (Type.Int, "-" <> e)
-      Type.Real -> pure (Type.Real, "-" <> e)
+      Type.Int -> pure (Type.Int, squareBrackets $ "-" <> e)
+      Type.Real -> pure (Type.Real, squareBrackets $ "-" <> e)
       _ -> throwError $ TypeMismatch t Type.Real
   Add x y -> additive x y "+"
   Sub x y -> additive x y "-"

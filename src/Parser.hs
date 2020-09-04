@@ -18,6 +18,8 @@ import qualified Literal as Lit
 import Syntax
 import Text.Megaparsec
   ( lookAhead,
+    notFollowedBy,
+    oneOf,
     sepBy,
     sepEndBy,
     try,
@@ -83,8 +85,8 @@ table =
     ]
   ]
   where
-    prefix name f = Prefix (f <$ symbol name)
-    infixLeft name f = InfixL (f <$ symbol name)
+    prefix sym f = Prefix (f <$ symbol sym <* notFollowedBy (oneOf ['-', '+']))
+    infixLeft sym f = InfixL (f <$ symbol sym)
 
 -- Arguments
 
