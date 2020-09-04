@@ -65,7 +65,7 @@ braces = between (symbol "{" <* nl) (nl *> symbol "}")
     nl = lexeme $ optional eol
 
 semicolon :: Parser Text
-semicolon =  symbol ";"
+semicolon = symbol ";"
 
 comma :: Parser Text
-comma =  symbol ","
+comma = symbol ","

@@ -10,8 +10,10 @@ import Control.Monad.Combinators
   )
 import Control.Monad.Combinators.Expr
 import Control.Monad.Combinators.NonEmpty (some)
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer
+import Literal (Literal)
 import qualified Literal as Lit
 import Syntax
 import Text.Megaparsec
@@ -25,6 +27,8 @@ import Text.Megaparsec.Char
   ( char,
     eol,
   )
+import Type (Type)
+import qualified Type
 
 -- Program
 
@@ -44,18 +48,19 @@ term =
       function,
       reference,
       variable,
-      literal
+      Lit <$> literal
     ]
   where
     function = try $ Fun <$> identifier <*> parens (sepBy expr comma)
-    literal =
-      Lit
-        <$> choice
-          [ Lit.Bool True <$ symbol "True",
-            Lit.Bool False <$ symbol "False",
-            Lit.Real <$> try real,
-            Lit.Int <$> integer
-          ]
+
+literal :: Parser Literal
+literal =
+  choice
+    [ Lit.Bool True <$ symbol "True",
+      Lit.Bool False <$ symbol "False",
+      Lit.Real <$> try real,
+      Lit.Int <$> natural
+    ]
 
 variable :: Parser Expr
 variable = Var <$> identifier
@@ -83,13 +88,24 @@ table =
 
 -- Arguments
 
-arg :: Parser Argument
+arg :: Parser (Name, Argument)
 arg = do
   name <- identifier
+  mtype <- optional $ symbol ":" >> parseType
+  val <- optional $ symbol "=" >> literal
   desc <- optional (Text.pack <$> (char '(' >> manyTill charLiteral (char ')')))
-  pure (name, desc)
+  let t = fromMaybe Type.Real $ mtype <|> Lit.type' <$> val
+  pure $ (name, Argument {argType = t, value = val, description = desc})
 
-args :: Parser [Argument]
+parseType :: Parser Type
+parseType =
+  choice
+    [ Type.Real <$ symbol "Real",
+      Type.Int <$ symbol "Int",
+      Type.Bool <$ symbol "Bool"
+    ]
+
+args :: Parser [(Name, Argument)]
 args =
   symbol "Args"
     >> parens (sepBy arg sep)

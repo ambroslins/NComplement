@@ -3,6 +3,7 @@ module Generator where
 import Control.Applicative ((<|>))
 import Control.Monad (when)
 import qualified Data.Map as Map
+import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
@@ -17,36 +18,60 @@ import qualified Type
 
 program :: Program -> Gen ()
 program p = do
-  emitsWithFuture $ \env ->
-    map
-      (\(name, var) -> pure $ definition (address var) (Lit.Real 0.0) name)
-      (Map.toList $ variables env)
+  defineArgs (arguments p)
+  emit ""
+  defineVars
+  emit ""
   mapM_ statement (body p)
 
-definition :: Address -> Literal -> Text -> Text
+defineArgs :: [(Name, Argument)] -> Gen ()
+defineArgs = mapM_ def
+  where
+    def (name, arg) = do
+      vars <- gets variables
+      if name `Map.member` vars
+        then throwError $ Error
+        else do
+          adr <- nextAddress
+          let var = Variable {type' = argType arg, address = adr}
+          modifyVars $ Map.insert name var
+          emit $ definition adr (value arg) (fromMaybe name (description arg))
+
+defineVars :: Gen ()
+defineVars = do
+  prev <- gets variables
+  emitsWithFuture $ \env ->
+    map
+      (pure . def)
+      (Map.toList (Map.difference (variables env) prev))
+  where
+    def (name, var) = definition (address var) Nothing name
+
+definition :: Address -> Maybe Literal -> Text -> Text
 definition adr val desc =
   "H" <> showText adr
     <> "   =  "
     <> sign
     <> num
-    <> "  ("
-    <> Text.justifyLeft 53 ' ' desc
+    <> "  ( "
+    <> Text.justifyLeft 43 ' ' desc
     <> ")"
   where
     sign = case val of
-      (Lit.Real x) | x < 0.0 -> "-"
-      (Lit.Int x) | x < 0 -> "-"
+      Just (Lit.Real x) | x < 0.0 -> "-"
+      Just (Lit.Int x) | x < 0 -> "-"
       _ -> "+"
     num = case val of
-      (Lit.Real x) ->
+      Nothing -> "000000.0000"
+      Just (Lit.Real x) ->
         let (int, frac) = Text.breakOn "." (showText (abs x))
          in Text.justifyRight 6 '0' int <> Text.justifyLeft 5 '0' (Text.take 5 frac)
-      (Lit.Int x) ->
+      Just (Lit.Int x) ->
         Text.replicate 6 "0" <> "."
           <> Text.justifyRight 4 '0' (showText (abs x))
-      (Lit.Bool x) ->
+      Just (Lit.Bool x) ->
         Text.replicate 6 "0" <> "."
-          <> Text.justifyRight 4 '0' (showText x)
+          <> Text.justifyRight 4 '0' (showText (Lit.Bool x))
 
 expr :: Expr -> Gen (Type, Text)
 expr = \case
@@ -178,11 +203,11 @@ statement stmt = do
       when (Map.member name ls) $ throwError $ Error
       rn <- nextRecordNumber
       modifyLabels $ Map.insert name rn
-      emit $ "N" <> showText rn
+      emit $ "N" <> showText rn <> " (" <> name <> ")"
     Jump name ->
       emitWithFuture $
         maybe
           (Left $ UndefinedLabel name)
-          (Right . ("JUMP" <>) . showText)
+          (Right . \rn -> "JUMP" <> showText rn <> " (" <> name <> ")")
           . Map.lookup name
           . labels

@@ -2,13 +2,18 @@ module Syntax where
 
 import Data.Text (Text)
 import Literal (Literal)
+import Type (Type)
 
 type Name = Text
 
-type Argument = (Name, Maybe Text)
+data Argument = Argument
+  { value :: Maybe Literal,
+    argType :: Type,
+    description :: Maybe Text
+  }
 
 data Program = Program
-  { arguments :: [Argument],
+  { arguments :: [(Name, Argument)],
     body :: [Statement]
   }
 
