@@ -1,6 +1,9 @@
 module Lexer
   ( Parser,
+    sc,
+    scn,
     lexeme,
+    lexeme',
     symbol,
     identifier,
     reserved,
@@ -32,8 +35,18 @@ sc =
     (Lex.skipLineComment "#")
     empty
 
+scn :: Parser ()
+scn =
+  Lex.space
+    (optional (char ';') >> space1)
+    (Lex.skipLineComment "#")
+    empty
+
 lexeme :: Parser a -> Parser a
 lexeme = Lex.lexeme sc
+
+lexeme' :: Parser a -> Parser a
+lexeme' = Lex.lexeme scn
 
 symbol :: Text -> Parser Text
 symbol = Lex.symbol sc

@@ -2,6 +2,8 @@ module Generator where
 
 import Control.Applicative ((<|>))
 import Control.Monad (when)
+import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
@@ -211,3 +213,15 @@ statement stmt = do
           (Right . \rn -> "JUMP" <> showText rn <> " (" <> name <> ")")
           . Map.lookup name
           . labels
+    Code c -> code c
+
+code :: Code -> Gen ()
+code = \case
+  G00 xss -> mapM_ fs $ toList xss
+    where
+      fs xs = do
+        xs' <- mapM f $ toList xs
+        emit $ "G00 " <> Text.intercalate " " xs'
+      f (a, x) = do
+        (_, x') <- expr x
+        pure $ showText a <> x'

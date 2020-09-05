@@ -10,6 +10,7 @@ import Control.Monad.Combinators
   )
 import Control.Monad.Combinators.Expr
 import Control.Monad.Combinators.NonEmpty (some)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer
@@ -17,7 +18,8 @@ import Literal (Literal)
 import qualified Literal as Lit
 import Syntax
 import Text.Megaparsec
-  ( lookAhead,
+  ( eof,
+    lookAhead,
     notFollowedBy,
     oneOf,
     sepBy,
@@ -29,13 +31,17 @@ import Text.Megaparsec.Char
   ( char,
     eol,
   )
+import Text.Megaparsec.Char.Lexer
+  ( indentGuard,
+    indentLevel,
+  )
 import Type (Type)
 import qualified Type
 
 -- Program
 
 program :: Parser Program
-program = Program <$> option [] args <*> statements
+program = Program <$> option [] args <*> statements <* (scn >> eof)
 
 -- Expression
 
@@ -118,20 +124,20 @@ args =
 -- Statement
 
 statements :: Parser [Statement]
-statements = sepEndBy statement sep
-  where
-    sep = some $ lexeme (semicolon <|> eol)
+statements = many statement
 
 statement :: Parser Statement
 statement =
-  choice
-    [ ifStatement,
-      try label,
-      assignment,
-      scope,
-      unsafe,
-      jump
-    ]
+  lexeme' $
+    choice
+      [ ifStatement,
+        try label,
+        assignment,
+        scope,
+        unsafe,
+        jump,
+        Code <$> code
+      ]
   where
     ifStatement = do
       reserved "If"
@@ -148,5 +154,25 @@ statement =
       e <- expr
       pure $ Assign var e
     scope = Scope <$> braces statements
-    unsafe = Unsafe . Text.pack <$> (symbol "!" *> manyTill charLiteral (lookAhead (semicolon <|> eol)))
+    unsafe =
+      Unsafe . Text.pack
+        <$> (symbol "!" *> manyTill charLiteral (lookAhead (semicolon <|> eol)))
     jump = symbol "JUMP" >> Jump <$> identifier
+
+code :: Parser Code
+code = do
+  _ <- symbol "G00"
+  i <- indentLevel
+  x <- p
+  xs <- many $ try $ indentGuard scn EQ i >> p
+  pure $ G00 (x :| xs)
+  where
+    p :: Parser (NonEmpty (Axis, Expr))
+    p = some $ (,) <$> axis <*> expr
+
+axis :: Parser Axis
+axis =
+  choice $
+    map
+      (\a -> a <$ symbol (Text.pack $ show a))
+      [minBound .. maxBound]

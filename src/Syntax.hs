@@ -1,5 +1,6 @@
 module Syntax where
 
+import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
 import Literal (Literal)
 import Type (Type)
@@ -37,6 +38,7 @@ data Statement
   | Unsafe Text
   | Label Name
   | Jump Name
+  | Code Code
   deriving (Eq, Show)
 
 data Comparison
@@ -50,3 +52,10 @@ instance Show Comparison where
     Eq -> "="
     Lt -> "<"
     Gt -> ">"
+
+data Code
+  = G00 (NonEmpty (NonEmpty (Axis, Expr)))
+  deriving (Eq, Show)
+
+data Axis = X | Y | Z | U | V
+  deriving (Eq, Ord, Show, Enum, Bounded)
