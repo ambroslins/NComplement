@@ -3,7 +3,6 @@ module Generator where
 import Control.Applicative ((<|>))
 import Control.Monad (when)
 import Data.Foldable (toList)
-import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)

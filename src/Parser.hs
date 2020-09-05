@@ -23,7 +23,6 @@ import Text.Megaparsec
     notFollowedBy,
     oneOf,
     sepBy,
-    sepEndBy,
     try,
     (<?>),
   )

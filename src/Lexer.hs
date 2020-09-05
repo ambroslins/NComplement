@@ -51,14 +51,17 @@ lexeme' = Lex.lexeme scn
 symbol :: Text -> Parser Text
 symbol = Lex.symbol sc
 
+identEnd :: Parser Char
+identEnd = alphaNumChar <|> oneOf ['_', '\'']
+
 identifier :: Parser Text
 identifier = lexeme $ do
-  x <- lowerChar <|> oneOf ['_', '\'']
-  xs <- many $ alphaNumChar <|> char '_'
+  x <- lowerChar <|> char '_'
+  xs <- many $ identEnd
   pure $ Text.pack (x : xs)
 
 reserved :: Text -> Parser ()
-reserved x = lexeme $ string x >> notFollowedBy (alphaNumChar <|> char '_')
+reserved x = lexeme $ string x >> notFollowedBy identEnd
 
 natural :: (Integral a, Num a) => Parser a
 natural = lexeme Lex.decimal
@@ -73,9 +76,7 @@ parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
 braces :: Parser a -> Parser a
-braces = between (symbol "{" <* nl) (nl *> symbol "}")
-  where
-    nl = lexeme $ optional eol
+braces = between (Lex.symbol scn "{") (Lex.symbol scn "}")
 
 semicolon :: Parser Text
 semicolon = symbol ";"
