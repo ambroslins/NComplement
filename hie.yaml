@@ -1,0 +1,13 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "NCompiler:lib"
+
+    - path: "./app/Main.hs"
+      component: "NCompiler:exe:NCompiler-exe"
+
+    - path: "./app/Paths_NCompiler.hs"
+      component: "NCompiler:exe:NCompiler-exe"
+
+    - path: "./test"
+      component: "NCompiler:test:NCompiler-test"

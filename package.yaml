@@ -58,5 +58,10 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Wall
+    - -fno-warn-orphans
     dependencies:
     - NCompiler
+    - hspec
+    - hspec-megaparsec
+    - QuickCheck
