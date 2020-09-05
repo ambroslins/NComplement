@@ -16,3 +16,6 @@ spec = do
             parse Parser.expr "" (Text.pack x) `shouldParse` expr
     "1+1" `shouldParseTo` (let x = Lit (Lit.Int 1) in Add x x)
     "1+1*1" `shouldParseTo` (let x = Lit (Lit.Int 1) in Add x (Mul x x))
+    "(1+1)*1" `shouldParseTo` (let x = Lit (Lit.Int 1) in Mul (Add x x) x)
+    "var+2" `shouldParseTo` Add (Var "var") (Lit (Lit.Int 2))
+    "fun(1, 2)" `shouldParseTo` Fun "fun" [(Lit (Lit.Int 1)), (Lit (Lit.Int 2))]
