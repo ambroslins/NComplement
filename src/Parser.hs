@@ -10,7 +10,6 @@ import Control.Monad.Combinators
   )
 import Control.Monad.Combinators.Expr
 import Control.Monad.Combinators.NonEmpty (some)
-import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer
@@ -29,10 +28,7 @@ import Text.Megaparsec
 import Text.Megaparsec.Char
   ( char,
     eol,
-  )
-import Text.Megaparsec.Char.Lexer
-  ( indentGuard,
-    indentLevel,
+    string,
   )
 import Type (Type)
 import qualified Type
@@ -135,7 +131,7 @@ statement =
         scope,
         unsafe,
         jump,
-        Code <$> code
+        Codes <$> some code
       ]
   where
     ifStatement = do
@@ -159,19 +155,14 @@ statement =
     jump = symbol "JUMP" >> Jump <$> identifier
 
 code :: Parser Code
-code = do
-  _ <- symbol "G00"
-  i <- indentLevel
-  x <- p
-  xs <- many $ try $ indentGuard scn EQ i >> p
-  pure $ G00 (x :| xs)
-  where
-    p :: Parser (NonEmpty (Axis, Expr))
-    p = some $ (,) <$> axis <*> expr
-
-axis :: Parser Axis
-axis =
-  choice $
-    map
-      (\a -> a <$ symbol (Text.pack $ show a))
-      [minBound .. maxBound]
+code =
+  choice
+    [ G <$ string "G" <*> natural,
+      X <$ string "X" <*> expr,
+      Y <$ string "Y" <*> expr,
+      Z <$ string "Z" <*> expr,
+      U <$ string "U" <*> expr,
+      V <$ string "V" <*> expr,
+      M <$ string "M" <*> natural,
+      F <$ string "F" <*> expr
+    ]

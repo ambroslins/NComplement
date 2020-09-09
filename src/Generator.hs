@@ -1,10 +1,12 @@
 module Generator where
 
 import Control.Applicative ((<|>))
-import Control.Monad (when)
+import Control.Monad (forM, when)
 import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
@@ -212,15 +214,53 @@ statement stmt = do
           (Right . \rn -> "JUMP" <> showText rn <> " (" <> name <> ")")
           . Map.lookup name
           . labels
-    Code c -> code c
+    Codes cs -> instr cs
 
-code :: Code -> Gen ()
-code = \case
-  G00 xss -> mapM_ fs $ toList xss
-    where
-      fs xs = do
-        xs' <- mapM f $ toList xs
-        emit $ "G00 " <> Text.intercalate " " xs'
-      f (a, x) = do
-        (_, x') <- expr x
-        pure $ showText a <> x'
+instr :: NonEmpty Code -> Gen ()
+instr cs = emit =<< Text.intercalate " " <$> instr' (toList cs)
+
+instr' :: [Code] -> Gen [Text]
+instr' = \case
+  [] -> pure []
+  G 0 : xs -> do
+    xs' <- forM xs $ \case
+      X x -> Text.cons 'X' <$> requireType Type.Real x
+      Y y -> Text.cons 'Y' <$> requireType Type.Real y
+      Z z -> Text.cons 'Z' <$> requireType Type.Real z
+      U u -> Text.cons 'U' <$> requireType Type.Real u
+      V v -> Text.cons 'V' <$> requireType Type.Real v
+      M 5 -> pure "M05"
+      F f -> Text.cons 'F' <$> requireType Type.Real f
+      _ -> throwError Error
+    pure $ "G00" : xs'
+  G 1 : xs -> do
+    xs' <- forM xs $ \case
+      X x -> Text.cons 'X' <$> requireType Type.Real x
+      Y x -> Text.cons 'Y' <$> requireType Type.Real x
+      Z x -> Text.cons 'Z' <$> requireType Type.Real x
+      _ -> throwError Error
+    pure $ "G01" : xs'
+  G 4 : xs -> case xs of
+    [X x] -> sequence $ [pure "G04", Text.cons 'X' <$> requireType Type.Real x]
+    _ -> throwError $ Error
+  G g : cs
+    | Set.member g modalG ->
+      (Text.cons 'G' (Text.justifyRight 2 '0' (showText g)) :)
+        <$> (instr' cs)
+  _ -> throwError Error
+  where
+    requireType t x = do
+      (t', x') <- expr x
+      if t' == t then pure x' else throwError $ TypeMismatch t' t
+    modalG =
+      Set.fromList $
+        concat
+          [ [5 .. 9],
+            [11, 12],
+            [26, 27],
+            [28 .. 30],
+            [40 .. 42],
+            [100 * x + y | x <- [0 .. 9], y <- [54 .. 59]],
+            [90, 91],
+            [126, 127]
+          ]

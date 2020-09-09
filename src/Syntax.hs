@@ -38,7 +38,7 @@ data Statement
   | Unsafe Text
   | Label Name
   | Jump Name
-  | Code Code
+  | Codes (NonEmpty Code)
   deriving (Eq, Show)
 
 data Comparison
@@ -47,15 +47,19 @@ data Comparison
   | Gt
   deriving (Eq)
 
+data Code
+  = G Int
+  | X Expr
+  | Y Expr
+  | Z Expr
+  | U Expr
+  | V Expr
+  | M Int
+  | F Expr
+  deriving (Eq, Show)
+
 instance Show Comparison where
   show = \case
     Eq -> "="
     Lt -> "<"
     Gt -> ">"
-
-data Code
-  = G00 (NonEmpty (NonEmpty (Axis, Expr)))
-  deriving (Eq, Show)
-
-data Axis = X | Y | Z | U | V
-  deriving (Eq, Ord, Show, Enum, Bounded)
