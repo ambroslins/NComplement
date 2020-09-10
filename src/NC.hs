@@ -14,6 +14,35 @@ data Statement
   | Escape Text
   deriving (Eq, Show)
 
+printStmts :: [Statement] -> Text
+printStmts = Text.unlines . map (<> ";") . map printStmt
+
+printStmt :: Statement -> Text
+printStmt = \case
+  Codes cs -> Text.intercalate " " $ map printCode cs
+  N rn -> "N" <> showText rn
+  Assign i e -> "H" <> showText i <> " = " <> printExpr e
+  IF (lhs, ord, rhs) (jT, jF) ->
+    "IF " <> printExpr lhs <> s <> printExpr rhs
+      <> "("
+      <> f jT
+      <> ","
+      <> f jF
+      <> ")"
+    where
+      s = case ord of
+        EQ -> "="
+        LT -> "<"
+        GT -> ">"
+      f = maybe "" showText
+  JUMP rn -> "JUMP" <> showText rn
+  CRT t -> "CRT" <> parens t
+  Definiton i _ desc -> "H" <> (showText i) <> "   =  " <> "+000000.0000" <> "  ( " <> Text.justifyLeft 43 ' ' desc <> ")"
+  Escape x -> x
+
+parens :: Text -> Text
+parens x = "(" <> x <> ")"
+
 data Code
   = G Int
   | X Expr
@@ -29,6 +58,21 @@ data Code
   | F Expr
   deriving (Eq, Show)
 
+printCode :: Code -> Text
+printCode = \case
+  G x -> "G" <> pad0 2 x
+  X x -> "X" <> printExpr x
+  Y x -> "Y" <> printExpr x
+  Z x -> "Z" <> printExpr x
+  U x -> "U" <> printExpr x
+  V x -> "V" <> printExpr x
+  P x -> "P" <> showText x
+  L x -> "L" <> showText x
+  C x -> "C" <> pad0 3 x
+  M x -> "M" <> pad0 2 x
+  Q x -> "Q" <> x
+  F x -> "F" <> printExpr x
+
 data Expr
   = Int Int
   | Real Double
@@ -40,6 +84,23 @@ data Expr
   | Div Expr Expr
   | Fun Function Expr
   deriving (Eq, Show)
+
+printExpr :: Expr -> Text
+printExpr = \case
+  Int x -> showText x
+  Real x -> showText x
+  Var i -> "H" <> showText i
+  Neg x -> "-" <> brackets (printExpr x)
+  Add x y -> binary "+" x y
+  Sub x y -> binary "-" x y
+  Mul x y -> binary "*" x y
+  Div x y -> binary "/" x y
+  Fun f x -> showText f <> brackets (printExpr x)
+  where
+    binary s x y = brackets $ printExpr x <> s <> printExpr y
+
+brackets :: Text -> Text
+brackets x = "[" <> x <> "]"
 
 data Function
   = SIN
