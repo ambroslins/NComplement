@@ -137,11 +137,16 @@ statement =
     ifStatement = do
       reserved "If"
       lhs <- expr
-      comp <- choice [Eq <$ symbol "=", Lt <$ symbol "<", Gt <$ symbol ">"]
+      ord <-
+        choice
+          [ EQ <$ symbol "=",
+            LT <$ symbol "<",
+            GT <$ symbol ">"
+          ]
       rhs <- expr
       sThen <- statement
       sElse <- optional $ reserved "Else" *> statement
-      pure $ If (lhs, comp, rhs) sThen sElse
+      pure $ If (lhs, ord, rhs) sThen sElse
     label = Label <$> identifier <* symbol ":"
     assignment = do
       var <- identifier

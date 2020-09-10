@@ -2,7 +2,8 @@ module Gen
   ( Gen,
     Env (variables, labels),
     Variable (..),
-    Address,
+    Index,
+    unIndex,
     RecordNumber,
     runGenerator,
     emptyEnv,
@@ -15,10 +16,9 @@ module Gen
     emits,
     emitWithFuture,
     emitsWithFuture,
-    nextAddress,
+    nextIndex,
     nextRecordNumber,
     throwError,
-    showText,
   )
 where
 
@@ -27,42 +27,26 @@ import Control.Monad.Tardis
 import Control.Monad.Writer
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Data.Text (Text)
-import qualified Data.Text as Text
 import Error
+import NC (Index (..), RecordNumber (..), Statement)
 import Syntax (Name)
 import Type (Type)
 
-type Gen = WriterT [Either Error Text] (ExceptT Error (Tardis Env Env))
-
-showText :: Show a => a -> Text
-showText = Text.pack . show
-
-newtype Address = Address Int
-  deriving (Eq, Ord)
-
-instance Show Address where
-  show (Address x) = Text.unpack $ Text.justifyRight 3 '0' $ showText x
-
-newtype RecordNumber = RecordNumber Int
-  deriving (Eq, Ord)
-
-instance Show RecordNumber where
-  show (RecordNumber x) = Text.unpack $ Text.justifyRight 4 '0' $ showText x
+type Gen = WriterT [Either Error Statement] (ExceptT Error (Tardis Env Env))
 
 data Env = Env
-  { offsetAddress :: Address,
+  { offsetIndex :: Index,
     recordNumber :: RecordNumber,
     variables :: Map Name Variable,
     labels :: Map Name RecordNumber
   }
 
 data Variable = Variable
-  { address :: Address,
+  { index :: Index,
     type' :: Type
   }
 
-runGenerator :: Env -> Gen a -> Either Error [Text]
+runGenerator :: Env -> Gen a -> Either Error [Statement]
 runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT . revert
   where
     foldEither [] = Right []
@@ -73,7 +57,7 @@ runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . r
 emptyEnv :: Env
 emptyEnv =
   Env
-    { offsetAddress = Address 0,
+    { offsetIndex = Index 0,
       recordNumber = RecordNumber 0,
       variables = Map.empty,
       labels = Map.empty
@@ -94,23 +78,23 @@ modifyVars f = modify $ \env -> env {variables = f (variables env)}
 modifyLabels :: (Map Name RecordNumber -> Map Name RecordNumber) -> Gen ()
 modifyLabels f = modify $ \env -> env {labels = f (labels env)}
 
-emit :: Text -> Gen ()
+emit :: Statement -> Gen ()
 emit = tell . pure . pure
 
-emits :: [Text] -> Gen ()
+emits :: [Statement] -> Gen ()
 emits = mapM_ emit
 
-emitWithFuture :: (Env -> Either Error Text) -> Gen ()
+emitWithFuture :: (Env -> Either Error Statement) -> Gen ()
 emitWithFuture = emitsWithFuture . fmap pure
 
-emitsWithFuture :: (Env -> [Either Error Text]) -> Gen ()
+emitsWithFuture :: (Env -> [Either Error Statement]) -> Gen ()
 emitsWithFuture f = (lift $ lift $ getFuture) >>= tell . f
 
-nextAddress :: Gen Address
-nextAddress = do
-  Address a <- gets offsetAddress
-  modify $ \env -> env {offsetAddress = Address (1 + a)}
-  pure $ Address a
+nextIndex :: Gen Index
+nextIndex = do
+  Index i <- gets offsetIndex
+  modify $ \env -> env {offsetIndex = Index (1 + i)}
+  pure $ Index i
 
 nextRecordNumber :: Gen RecordNumber
 nextRecordNumber = do

@@ -33,19 +33,13 @@ data Expr
 
 data Statement
   = Assign Name Expr
-  | If (Expr, Comparison, Expr) Statement (Maybe Statement)
+  | If (Expr, Ordering, Expr) Statement (Maybe Statement)
   | Scope [Statement]
   | Unsafe Text
   | Label Name
   | Jump Name
   | Codes (NonEmpty Code)
   deriving (Eq, Show)
-
-data Comparison
-  = Eq
-  | Lt
-  | Gt
-  deriving (Eq)
 
 data Code
   = G Int
@@ -57,9 +51,3 @@ data Code
   | M Int
   | F Expr
   deriving (Eq, Show)
-
-instance Show Comparison where
-  show = \case
-    Eq -> "="
-    Lt -> "<"
-    Gt -> ">"

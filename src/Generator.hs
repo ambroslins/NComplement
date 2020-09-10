@@ -3,16 +3,13 @@ module Generator where
 import Control.Applicative ((<|>))
 import Control.Monad (forM, when)
 import Data.Foldable (toList)
-import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
 import qualified Data.Set as Set
-import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
 import Gen
-import Literal (Literal)
 import qualified Literal as Lit
+import qualified NC
 import qualified Parser
 import Replace.Megaparsec (splitCap)
 import Syntax
@@ -22,9 +19,7 @@ import qualified Type
 program :: Program -> Gen ()
 program p = do
   defineArgs (arguments p)
-  emit ""
   defineVars
-  emit ""
   mapM_ statement (body p)
 
 defineArgs :: [(Name, Argument)] -> Gen ()
@@ -35,10 +30,10 @@ defineArgs = mapM_ def
       if name `Map.member` vars
         then throwError $ Error
         else do
-          adr <- nextAddress
-          let var = Variable {type' = argType arg, address = adr}
+          i <- nextIndex
+          let var = Variable {type' = argType arg, index = i}
           modifyVars $ Map.insert name var
-          emit $ definition adr (value arg) (fromMaybe name (description arg))
+          emit $ NC.Definiton i (Left 0) name
 
 defineVars :: Gen ()
 defineVars = do
@@ -48,43 +43,17 @@ defineVars = do
       (pure . def)
       (Map.toList (Map.difference (variables env) prev))
   where
-    def (name, var) = definition (address var) Nothing name
+    def (name, var) = NC.Definiton (index var) (Left 0) name
 
-definition :: Address -> Maybe Literal -> Text -> Text
-definition adr val desc =
-  "H" <> showText adr
-    <> "   =  "
-    <> sign
-    <> num
-    <> "  ( "
-    <> Text.justifyLeft 43 ' ' desc
-    <> ")"
-  where
-    sign = case val of
-      Just (Lit.Real x) | x < 0.0 -> "-"
-      Just (Lit.Int x) | x < 0 -> "-"
-      _ -> "+"
-    num = case val of
-      Nothing -> "000000.0000"
-      Just (Lit.Real x) ->
-        let (int, frac) = Text.breakOn "." (showText (abs x))
-         in Text.justifyRight 6 '0' int <> Text.justifyLeft 5 '0' (Text.take 5 frac)
-      Just (Lit.Int x) ->
-        Text.replicate 6 "0" <> "."
-          <> Text.justifyRight 4 '0' (showText (abs x))
-      Just (Lit.Bool x) ->
-        Text.replicate 6 "0" <> "."
-          <> Text.justifyRight 4 '0' (showText (Lit.Bool x))
-
-expr :: Expr -> Gen (Type, Text)
+expr :: Expr -> Gen (Type, NC.Expr)
 expr = \case
-  Lit x -> pure (Lit.type' x, showText x)
+  Lit x -> pure (Lit.type' x, Lit.toNC x)
   Var name -> do
     var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
-    pure (type' var, "H" <> (showText $ address var))
+    pure (type' var, NC.Var (index var))
   Ref name -> do
     var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
-    pure (type' var, showText $ address var)
+    pure (type' var, NC.Int (unIndex $ index var))
   Fun name args ->
     maybe
       (throwError $ UndefinedFun name)
@@ -93,27 +62,27 @@ expr = \case
   Neg x -> do
     (t, e) <- expr x
     case t of
-      Type.Int -> pure (Type.Int, squareBrackets $ "-" <> e)
-      Type.Real -> pure (Type.Real, squareBrackets $ "-" <> e)
+      Type.Int -> pure (Type.Int, NC.Neg e)
+      Type.Real -> pure (Type.Real, NC.Neg e)
       _ -> throwError $ TypeMismatch t Type.Real
-  Add x y -> additive x y "+"
-  Sub x y -> additive x y "-"
+  Add x y -> additive NC.Add x y
+  Sub x y -> additive NC.Sub x y
   Mul x y -> do
     (tx, ex) <- expr x
     (ty, ey) <- expr y
     case (tx, ty) of
-      (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "*")
-      (Type.Int, Type.Real) -> pure (Type.Real, formatInfix ex ey "*")
-      (Type.Real, Type.Int) -> pure (Type.Real, formatInfix ex ey "*")
-      (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "*" <> ey <> "/1.")
+      (Type.Int, Type.Int) -> pure (Type.Int, NC.Mul ex ey)
+      (Type.Int, Type.Real) -> pure (Type.Real, NC.Mul ex ey)
+      (Type.Real, Type.Int) -> pure (Type.Real, NC.Mul ex ey)
+      (Type.Real, Type.Real) -> pure (Type.Real, NC.Div (NC.Mul ex ey) (NC.Real 1.0))
       _ -> throwError $ TypeMismatch tx ty
   Div x y -> do
     (tx, ex) <- expr x
     (ty, ey) <- expr y
     case (tx, ty) of
-      (Type.Int, Type.Int) -> pure (Type.Int, formatInfix ex ey "/")
-      (Type.Real, Type.Int) -> pure (Type.Real, formatInfix ex ey "/")
-      (Type.Real, Type.Real) -> pure (Type.Real, squareBrackets $ ex <> "/" <> ey <> "*1.")
+      (Type.Int, Type.Int) -> pure (Type.Int, NC.Div ex ey)
+      (Type.Real, Type.Int) -> pure (Type.Real, NC.Div ex ey)
+      (Type.Real, Type.Real) -> pure (Type.Real, NC.Mul (NC.Div ex ey) (NC.Real 1.0))
       _ -> throwError $ TypeMismatch tx ty
   Pow n e ->
     expr $
@@ -125,29 +94,25 @@ expr = \case
           [] -> Lit $ Lit.Int 1
           x : xs -> foldr Mul x xs
   where
-    additive x y s = do
+    additive f x y = do
       (tx, ex) <- expr x
       (ty, ey) <- expr y
       t <- case (tx, ty) of
         (Type.Int, Type.Int) -> pure Type.Int
         (Type.Real, Type.Real) -> pure Type.Real
         _ -> throwError $ TypeMismatch tx ty
-      pure (t, formatInfix ex ey s)
-    formatInfix x y s = squareBrackets $ x <> s <> y
+      pure (t, f ex ey)
 
-squareBrackets :: Text -> Text
-squareBrackets x = "[" <> x <> "]"
-
-functions :: [(Name, [Expr] -> Gen (Type, Text))]
+functions :: [(Name, [Expr] -> Gen (Type, NC.Expr))]
 functions =
-  [ ("sin", included "SIN"),
-    ("cos", included "COS"),
-    ("tan", included "TAN"),
-    ("asin", included "ASIN"),
-    ("acos", included "ACOS"),
-    ("atan", included "ATAN"),
-    ("sqrt", included "SQRT"),
-    ("round", included "ROUND"),
+  [ ("sin", included NC.SIN),
+    ("cos", included NC.COS),
+    ("tan", included NC.TAN),
+    ("asin", included NC.ASIN),
+    ("acos", included NC.ACOS),
+    ("atan", included NC.ATAN),
+    ("sqrt", included NC.SQRT),
+    ("round", included NC.ROUND),
     ( "norm",
       \xs -> case map (Pow 2) xs of
         [] -> throwError $ Error
@@ -159,7 +124,7 @@ functions =
       [x] -> do
         (t, e) <- expr x
         case t of
-          Type.Real -> pure $ (Type.Real, f <> squareBrackets e)
+          Type.Real -> pure $ (Type.Real, NC.Fun f e)
           _ -> throwError $ TypeMismatch t Type.Real
       _ -> throwError $ Error
 
@@ -172,81 +137,75 @@ statement stmt = do
         vars <- gets variables
         case Map.lookup name vars of
           Nothing -> do
-            adr <- nextAddress
-            let v = Variable {address = adr, type' = t}
+            i <- nextIndex
+            let v = Variable {index = i, type' = t}
             modifyVars $ Map.insert name v
             pure v
           Just v -> do
             when (type' v /= t) $ throwError $ Error
             pure v
-      emit $ "H" <> showText (address var) <> " = " <> e
-    If (lhs, comp, rhs) thens melses -> do
+      emit $ NC.Assign (index var) e
+    If (lhs, ord, rhs) thens melses -> do
       (tl, el) <- expr lhs
       (tr, er) <- expr rhs
       when (tl /= tr) $ throwError $ Error
       rn1 <- nextRecordNumber
-      emit $ "IF " <> el <> showText comp <> er <> " (," <> showText rn1 <> ")"
+      emit $ NC.IF (el, ord, er) (Nothing, Just rn1)
       statement thens
       case melses of
-        Nothing -> emit $ "N" <> showText rn1
+        Nothing -> emit $ NC.N rn1
         Just elses -> do
           rn2 <- nextRecordNumber
-          emits $ ["JUMP" <> showText rn2, "N" <> showText rn1]
+          emits $ [NC.JUMP rn2, NC.N rn1]
           statement elses
-          emit $ "N" <> showText rn2
+          emit $ NC.N rn2
     Scope stmts -> mapM_ statement stmts
-    Unsafe x -> do
-      u <-
-        fmap (Text.concat) $
-          mapM (either pure (fmap snd . expr)) $
-            splitCap (Parser.reference <|> Parser.variable) x
-      emit u
+    Unsafe x ->
+      emit
+        =<< ( fmap (NC.Escape . Text.concat) $
+                mapM (either pure (fmap (Text.pack . show . snd) . expr)) $
+                  splitCap (Parser.reference <|> Parser.variable) x
+            )
     Label name -> do
       ls <- gets labels
       when (Map.member name ls) $ throwError $ Error
       rn <- nextRecordNumber
       modifyLabels $ Map.insert name rn
-      emit $ "N" <> showText rn <> " (" <> name <> ")"
+      emit $ NC.N rn
     Jump name ->
       emitWithFuture $
         maybe
           (Left $ UndefinedLabel name)
-          (Right . \rn -> "JUMP" <> showText rn <> " (" <> name <> ")")
+          (Right . NC.JUMP)
           . Map.lookup name
           . labels
-    Codes cs -> instr cs
+    Codes cs -> emit =<< NC.Codes <$> instr (toList cs)
 
-instr :: NonEmpty Code -> Gen ()
-instr cs = emit =<< Text.intercalate " " <$> instr' (toList cs)
-
-instr' :: [Code] -> Gen [Text]
-instr' = \case
+instr :: [Code] -> Gen [NC.Code]
+instr = \case
   [] -> pure []
   G 0 : xs -> do
     xs' <- forM xs $ \case
-      X x -> Text.cons 'X' <$> requireType Type.Real x
-      Y y -> Text.cons 'Y' <$> requireType Type.Real y
-      Z z -> Text.cons 'Z' <$> requireType Type.Real z
-      U u -> Text.cons 'U' <$> requireType Type.Real u
-      V v -> Text.cons 'V' <$> requireType Type.Real v
-      M 5 -> pure "M05"
-      F f -> Text.cons 'F' <$> requireType Type.Real f
+      X x -> NC.X <$> requireType Type.Real x
+      Y y -> NC.Y <$> requireType Type.Real y
+      Z z -> NC.Z <$> requireType Type.Real z
+      U u -> NC.U <$> requireType Type.Real u
+      V v -> NC.V <$> requireType Type.Real v
+      M 5 -> pure $ NC.M 5
+      F f -> NC.F <$> requireType Type.Real f
       _ -> throwError Error
-    pure $ "G00" : xs'
+    pure $ NC.G 0 : xs'
   G 1 : xs -> do
     xs' <- forM xs $ \case
-      X x -> Text.cons 'X' <$> requireType Type.Real x
-      Y x -> Text.cons 'Y' <$> requireType Type.Real x
-      Z x -> Text.cons 'Z' <$> requireType Type.Real x
+      X x -> NC.X <$> requireType Type.Real x
+      Y x -> NC.Y <$> requireType Type.Real x
+      Z x -> NC.Z <$> requireType Type.Real x
       _ -> throwError Error
-    pure $ "G01" : xs'
+    pure $ NC.G 1 : xs'
   G 4 : xs -> case xs of
-    [X x] -> sequence $ [pure "G04", Text.cons 'X' <$> requireType Type.Real x]
+    [X x] -> sequence $ [pure $ NC.G 4, NC.X <$> requireType Type.Real x]
     _ -> throwError $ Error
-  G g : cs
-    | Set.member g modalG ->
-      (Text.cons 'G' (Text.justifyRight 2 '0' (showText g)) :)
-        <$> (instr' cs)
+  G g : cs | Set.member g modalG -> (NC.G g :) <$> (instr cs)
   _ -> throwError Error
   where
     requireType t x = do
