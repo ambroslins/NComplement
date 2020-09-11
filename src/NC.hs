@@ -2,9 +2,12 @@ module NC where
 
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Literal (Literal)
+import qualified Literal as Lit
+import Syntax (Code (..), Value (..))
 
 data Statement
-  = Codes [Code]
+  = Codes [Code Expr]
   | N RecordNumber
   | Assign Index Expr
   | IF (Expr, Ordering, Expr) (Maybe RecordNumber, Maybe RecordNumber)
@@ -43,41 +46,12 @@ printStmt = \case
 parens :: Text -> Text
 parens x = "(" <> x <> ")"
 
-data Code
-  = G Int
-  | X Expr
-  | Y Expr
-  | Z Expr
-  | U Expr
-  | V Expr
-  | P RecordNumber
-  | L Int
-  | C Int
-  | M Int
-  | Q Text
-  | F Expr
-  | B Expr
-  | E Expr
-  | I Expr
-  deriving (Eq, Show)
+printCode :: Code Expr -> Text
+printCode (Code adr val) = adr <> printValue val
 
-printCode :: Code -> Text
-printCode = \case
-  G x -> "G" <> pad0 2 x
-  X x -> "X" <> printExpr x
-  Y x -> "Y" <> printExpr x
-  Z x -> "Z" <> printExpr x
-  U x -> "U" <> printExpr x
-  V x -> "V" <> printExpr x
-  P x -> "P" <> showText x
-  L x -> "L" <> showText x
-  C x -> "C" <> pad0 3 x
-  M x -> "M" <> pad0 2 x
-  Q x -> "Q" <> x
-  F x -> "F" <> printExpr x
-  B x -> "B" <> printExpr x
-  E x -> "E" <> printExpr x
-  I x -> "I" <> printExpr x
+printValue :: Value Expr -> Text
+printValue (Val x) = x
+printValue (Expr x) = printExpr x
 
 data Expr
   = Int Int
@@ -91,6 +65,12 @@ data Expr
   | Div Expr Expr
   | Fun Function Expr
   deriving (Eq, Show)
+
+fromLit :: Literal -> Expr
+fromLit = \case
+  Lit.Real x -> Real x
+  Lit.Int x -> Int x
+  Lit.Bool x -> Int $ if x then 1 else 0
 
 printExpr :: Expr -> Text
 printExpr = \case

@@ -8,7 +8,7 @@ import Type (Type)
 type Name = Text
 
 data Argument = Argument
-  { value :: Maybe Literal,
+  { defaultLit :: Maybe Literal,
     argType :: Type,
     description :: Maybe Text
   }
@@ -38,20 +38,13 @@ data Statement
   | Unsafe Text
   | Label Name
   | Jump Name
-  | Codes (NonEmpty Code)
+  | Codes (NonEmpty (Code Expr))
   deriving (Eq, Show)
 
-data Code
-  = G Int
-  | X Expr
-  | Y Expr
-  | Z Expr
-  | U Expr
-  | T Int
-  | V Expr
-  | M Int
-  | F Expr
-  | B Expr
-  | E Expr
-  | I Expr
+data Code a = Code Address (Value a)
+  deriving (Eq, Show)
+
+type Address = Text
+
+data Value a = Val Text | Expr a
   deriving (Eq, Show)

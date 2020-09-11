@@ -10,6 +10,7 @@ import Control.Monad.Combinators
   )
 import Control.Monad.Combinators.Expr
 import Control.Monad.Combinators.NonEmpty (some)
+import Data.Char (isUpper)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer
@@ -19,16 +20,17 @@ import Syntax
 import Text.Megaparsec
   ( eof,
     lookAhead,
+    match,
     notFollowedBy,
     oneOf,
     sepBy,
+    takeWhile1P,
     try,
     (<?>),
   )
 import Text.Megaparsec.Char
   ( char,
     eol,
-    string,
   )
 import Type (Type)
 import qualified Type
@@ -89,16 +91,23 @@ table =
     prefix sym f = Prefix (f <$ symbol sym <* notFollowedBy (oneOf ['-', '+']))
     infixLeft sym f = InfixL (f <$ symbol sym)
 
+value :: Parser (Value Expr)
+value =
+  match expr
+    >>= pure . \case
+      (v, Lit (Lit.Int _)) -> Val v
+      (_, x) -> Expr x
+
 -- Arguments
 
 arg :: Parser (Name, Argument)
 arg = do
   name <- identifier
   mtype <- optional $ symbol ":" >> parseType
-  val <- optional $ symbol "=" >> literal
+  def <- optional $ symbol "=" >> literal
   desc <- optional (Text.pack <$> (char '(' >> manyTill charLiteral (char ')')))
-  let t = fromMaybe Type.Real $ mtype <|> Lit.type' <$> val
-  pure $ (name, Argument {argType = t, value = val, description = desc})
+  let t = fromMaybe Type.Real $ mtype <|> Lit.type' <$> def
+  pure $ (name, Argument {argType = t, defaultLit = def, description = desc})
 
 parseType :: Parser Type
 parseType =
@@ -159,19 +168,5 @@ statement =
         <$> (symbol "!" *> manyTill charLiteral (lookAhead (semicolon <|> eol)))
     jump = symbol "JUMP" >> Jump <$> identifier
 
-code :: Parser Code
-code =
-  choice
-    [ G <$ string "G" <*> natural,
-      X <$ string "X" <*> expr,
-      Y <$ string "Y" <*> expr,
-      Z <$ string "Z" <*> expr,
-      U <$ string "U" <*> expr,
-      V <$ string "V" <*> expr,
-      T <$ string "T" <*> natural,
-      M <$ string "M" <*> natural,
-      F <$ string "F" <*> expr,
-      B <$ string "B" <*> expr,
-      E <$ string "E" <*> expr,
-      I <$ string "I" <*> expr
-    ]
+code :: Parser (Code Expr)
+code = Code <$> takeWhile1P (Just "address") isUpper <*> value

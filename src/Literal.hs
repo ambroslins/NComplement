@@ -1,11 +1,9 @@
 module Literal
   ( Literal (..),
     type',
-    toNC,
   )
 where
 
-import qualified NC
 import Type (Type)
 import qualified Type
 
@@ -21,8 +19,3 @@ type' = \case
   Int _ -> Type.Int
   Bool _ -> Type.Bool
 
-toNC :: Literal -> NC.Expr
-toNC = \case
-  Real x -> NC.Real x
-  Int x -> NC.Int x
-  Bool x -> NC.Int $ if x then 1 else 0

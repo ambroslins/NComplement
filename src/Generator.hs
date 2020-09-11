@@ -1,10 +1,9 @@
 module Generator where
 
 import Control.Applicative ((<|>))
-import Control.Monad (forM, when)
+import Control.Monad ( when)
 import Data.Foldable (toList)
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import qualified Data.Text as Text
 import Error
 import Gen
@@ -47,7 +46,7 @@ defineVars = do
 
 expr :: Expr -> Gen (Type, NC.Expr)
 expr = \case
-  Lit x -> pure (Lit.type' x, Lit.toNC x)
+  Lit x -> pure (Lit.type' x, NC.fromLit x)
   Var name -> do
     var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
     pure (type' var, NC.Var (index var))
@@ -180,62 +179,7 @@ statement stmt = do
           . labels
     Codes cs -> emit =<< NC.Codes <$> instr (toList cs)
 
-instr :: [Code] -> Gen [NC.Code]
-instr = \case
-  [] -> pure []
-  G 0 : xs -> do
-    xs' <- forM xs $ \case
-      M 5 -> pure $ NC.M 5
-      F f -> NC.F <$> requireType Type.Real f
-      x -> axis x
-    pure $ NC.G 0 : xs'
-  G 1 : xs -> do
-    xs' <- forM xs $ \case
-      F x -> NC.F <$> requireType Type.Real x
-      x -> axis x
-    pure $ NC.G 1 : xs'
-  G 4 : xs -> case xs of
-    [X x] -> sequence $ [pure $ NC.G 4, NC.X <$> requireType Type.Real x]
-    _ -> throwError $ Error
-  G 80 : xs -> (NC.G 80 :) <$> forM xs axis
-  G 82 : xs -> (NC.G 82 :) <$> forM xs axis
-  G 83 : xs ->
-    (NC.G 83 :)
-      <$> forM
-        xs
-        ( \case
-            X x -> NC.X <$> requireType Type.Int x
-            Y x -> NC.Y <$> requireType Type.Int x
-            Z x -> NC.Z <$> requireType Type.Int x
-            U x -> NC.U <$> requireType Type.Int x
-            V x -> NC.V <$> requireType Type.Int x
-            B x -> NC.B <$> requireType Type.Int x
-            E x -> NC.E <$> requireType Type.Int x
-            I x -> NC.I <$> requireType Type.Int x
-            _ -> throwError $ Error
-        )
-  G g : cs | Set.member g modalG -> (NC.G g :) <$> (instr cs)
-  _ -> throwError Error
-  where
-    axis = \case
-      X x -> NC.X <$> requireType Type.Real x
-      Y x -> NC.Y <$> requireType Type.Real x
-      Z x -> NC.Z <$> requireType Type.Real x
-      U x -> NC.U <$> requireType Type.Real x
-      V x -> NC.U <$> requireType Type.Real x
-      _ -> throwError Error
-    requireType t x = do
-      (t', x') <- expr x
-      if t' == t then pure x' else throwError $ TypeMismatch t' t
-    modalG =
-      Set.fromList $
-        concat
-          [ [5 .. 9],
-            [11, 12],
-            [26, 27],
-            [28 .. 30],
-            [40 .. 42],
-            [100 * x + y | x <- [0 .. 9], y <- [54 .. 59]],
-            [90, 91],
-            [126, 127]
-          ]
+instr :: [Code Expr] -> Gen [Code NC.Expr]
+instr = mapM $ \case
+  Code adr (Val x) -> pure $ Code adr (Val x)
+  Code adr (Expr x) -> Code adr . Expr . snd <$> expr x
