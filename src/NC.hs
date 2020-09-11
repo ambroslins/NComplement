@@ -17,6 +17,9 @@ data Statement
   | Escape Text
   deriving (Eq, Show)
 
+g :: Int -> Code Expr
+g x = Code "G" (Val $ pad0 2 x)
+
 printStmts :: [Statement] -> Text
 printStmts = Text.unlines . map (<> ";") . map printStmt
 

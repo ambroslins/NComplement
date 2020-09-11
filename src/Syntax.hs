@@ -47,6 +47,8 @@ data Statement
   | Label Name
   | Jump Name
   | Codes (NonEmpty (Code Expr))
+  | Get Name Address
+  | Set Address Expr
   deriving (Eq, Show)
 
 data Code a = Code Address (Value a)

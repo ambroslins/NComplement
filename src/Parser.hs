@@ -10,7 +10,7 @@ import Control.Monad.Combinators
   )
 import Control.Monad.Combinators.Expr
 import Control.Monad.Combinators.NonEmpty (some)
-import Data.Char (isUpper)
+import Data.Char (isSpace, isUpper)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer
@@ -98,7 +98,7 @@ value :: Parser (Value Expr)
 value =
   match expr
     >>= pure . \case
-      (v, Lit (Lit.Int _)) -> Val v
+      (v, Lit (Lit.Int _)) -> Val $ Text.takeWhile (not . isSpace) v
       (_, x) -> Expr x
 
 -- Arguments
@@ -139,6 +139,8 @@ statement =
     choice
       [ ifStatement,
         try label,
+        get,
+        set,
         assignment,
         scope,
         unsafe,
@@ -160,6 +162,8 @@ statement =
       sElse <- optional $ reserved "Else" *> statement
       pure $ If (lhs, ord, rhs) sThen sElse
     label = Label <$> name <* symbol ":"
+    get = Get <$> try (name <* symbol "<-") <*> address
+    set = Set <$> try (address <* symbol "<-") <*> expr
     assignment = do
       var <- name
       _ <- symbol "="
@@ -172,4 +176,7 @@ statement =
     jump = symbol "JUMP" >> Jump <$> name
 
 code :: Parser (Code Expr)
-code = Code <$> takeWhile1P (Just "address") isUpper <*> value
+code = Code <$> address <*> value
+
+address :: Parser Address
+address = lexeme $ takeWhile1P (Just "address") isUpper

@@ -1,7 +1,7 @@
 module Generator where
 
 import Control.Applicative ((<|>))
-import Control.Monad ( when)
+import Control.Monad (when)
 import Data.Foldable (toList)
 import qualified Data.Map as Map
 import qualified Data.Text as Text
@@ -132,17 +132,7 @@ statement stmt = do
   case stmt of
     Assign name x -> do
       (t, e) <- expr x
-      var <- do
-        vars <- gets variables
-        case Map.lookup name vars of
-          Nothing -> do
-            i <- nextIndex
-            let v = Variable {index = i, type' = t}
-            modifyVars $ Map.insert name v
-            pure v
-          Just v -> do
-            when (type' v /= t) $ throwError $ Error
-            pure v
+      var <- insertVar name t
       emit $ NC.Assign (index var) e
     If (lhs, ord, rhs) thens melses -> do
       (tl, el) <- expr lhs
@@ -178,6 +168,50 @@ statement stmt = do
           . Map.lookup name
           . labels
     Codes cs -> emit =<< NC.Codes <$> instr (toList cs)
+    Get name address -> do
+      let getters =
+            Map.fromList $
+              [ ("X", Type.Real),
+                ("Y", Type.Real),
+                ("Z", Type.Real),
+                ("U", Type.Real),
+                ("V", Type.Real),
+                ("I", Type.Int),
+                ("E", Type.Int)
+              ]
+      case Map.lookup address getters of
+        Nothing -> throwError $ Error
+        Just t -> do
+          var <- insertVar name t
+          emit $ NC.Codes [NC.g 83, Code address (Expr $ NC.Ref (index var))]
+    Set address x -> do
+      let setters =
+            Map.fromList $
+              [ ("X", Type.Real),
+                ("Y", Type.Real),
+                ("Z", Type.Real),
+                ("U", Type.Real),
+                ("V", Type.Real)
+              ]
+      case Map.lookup address setters of
+        Nothing -> throwError $ Error
+        Just t -> do
+          (t', x') <- expr x
+          if t == t'
+            then emit $ NC.Codes [NC.g 92, Code address (Expr x')]
+            else throwError $ Error
+  where
+    insertVar name t = do
+      vars <- gets variables
+      case Map.lookup name vars of
+        Nothing -> do
+          i <- nextIndex
+          let v = Variable {index = i, type' = t}
+          modifyVars $ Map.insert name v
+          pure v
+        Just v -> do
+          when (type' v /= t) $ throwError $ Error
+          pure v
 
 instr :: [Code Expr] -> Gen [Code NC.Expr]
 instr = mapM $ \case
