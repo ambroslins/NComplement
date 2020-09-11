@@ -47,7 +47,11 @@ data Code
   | Y Expr
   | Z Expr
   | U Expr
+  | T Int
   | V Expr
   | M Int
   | F Expr
+  | B Expr
+  | E Expr
+  | I Expr
   deriving (Eq, Show)

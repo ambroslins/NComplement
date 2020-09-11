@@ -56,6 +56,9 @@ data Code
   | M Int
   | Q Text
   | F Expr
+  | B Expr
+  | E Expr
+  | I Expr
   deriving (Eq, Show)
 
 printCode :: Code -> Text
@@ -72,6 +75,9 @@ printCode = \case
   M x -> "M" <> pad0 2 x
   Q x -> "Q" <> x
   F x -> "F" <> printExpr x
+  B x -> "B" <> printExpr x
+  E x -> "E" <> printExpr x
+  I x -> "I" <> printExpr x
 
 data Expr
   = Int Int

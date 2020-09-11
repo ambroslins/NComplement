@@ -168,6 +168,10 @@ code =
       Z <$ string "Z" <*> expr,
       U <$ string "U" <*> expr,
       V <$ string "V" <*> expr,
+      T <$ string "T" <*> natural,
       M <$ string "M" <*> natural,
-      F <$ string "F" <*> expr
+      F <$ string "F" <*> expr,
+      B <$ string "B" <*> expr,
+      E <$ string "E" <*> expr,
+      I <$ string "I" <*> expr
     ]

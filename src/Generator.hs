@@ -186,28 +186,40 @@ instr = \case
   [] -> pure []
   G 0 : xs -> do
     xs' <- forM xs $ \case
-      X x -> NC.X <$> requireType Type.Real x
-      Y y -> NC.Y <$> requireType Type.Real y
-      Z z -> NC.Z <$> requireType Type.Real z
-      U u -> NC.U <$> requireType Type.Real u
-      V v -> NC.V <$> requireType Type.Real v
       M 5 -> pure $ NC.M 5
       F f -> NC.F <$> requireType Type.Real f
-      _ -> throwError Error
+      x -> axis x
     pure $ NC.G 0 : xs'
   G 1 : xs -> do
     xs' <- forM xs $ \case
-      X x -> NC.X <$> requireType Type.Real x
-      Y x -> NC.Y <$> requireType Type.Real x
-      Z x -> NC.Z <$> requireType Type.Real x
-      _ -> throwError Error
+      F x -> NC.F <$> requireType Type.Real x
+      x -> axis x
     pure $ NC.G 1 : xs'
   G 4 : xs -> case xs of
     [X x] -> sequence $ [pure $ NC.G 4, NC.X <$> requireType Type.Real x]
     _ -> throwError $ Error
+  G 80 : xs -> forM xs axis
+  G 82 : xs -> forM xs axis
+  G 83 : xs -> forM xs $ \case
+    X x -> NC.X <$> requireType Type.Int x
+    Y x -> NC.Y <$> requireType Type.Int x
+    Z x -> NC.Z <$> requireType Type.Int x
+    U x -> NC.U <$> requireType Type.Int x
+    V x -> NC.V <$> requireType Type.Int x
+    B x -> NC.B <$> requireType Type.Int x
+    E x -> NC.E <$> requireType Type.Int x
+    I x -> NC.I <$> requireType Type.Int x
+    _ -> throwError $ Error
   G g : cs | Set.member g modalG -> (NC.G g :) <$> (instr cs)
   _ -> throwError Error
   where
+    axis = \case
+      X x -> NC.X <$> requireType Type.Real x
+      Y x -> NC.Y <$> requireType Type.Real x
+      Z x -> NC.Z <$> requireType Type.Real x
+      U x -> NC.U <$> requireType Type.Real x
+      V x -> NC.U <$> requireType Type.Real x
+      _ -> throwError Error
     requireType t x = do
       (t', x') <- expr x
       if t' == t then pure x' else throwError $ TypeMismatch t' t
