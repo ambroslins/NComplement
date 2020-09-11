@@ -7,12 +7,13 @@ import Data.Text (Text)
 import Data.Void (Void)
 import Text.Megaparsec.Error (ParseErrorBundle, errorBundlePretty)
 import Type (Type)
+import Syntax (Name)
 
 data Error
   = Error
-  | UndefinedVar Text
-  | UndefinedLabel Text
-  | UndefinedFun Text
+  | UndefinedVar Name
+  | UndefinedLabel Name
+  | UndefinedFun Name
   | TypeMismatch Type Type
   | ParseError (ParseErrorBundle Text Void)
   deriving (Eq)

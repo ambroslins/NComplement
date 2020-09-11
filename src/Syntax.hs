@@ -1,11 +1,19 @@
 module Syntax where
 
 import Data.List.NonEmpty (NonEmpty)
+import Data.String (IsString (..))
 import Data.Text (Text)
 import Literal (Literal)
 import Type (Type)
 
-type Name = Text
+newtype Name = Name {unName :: Text}
+  deriving (Eq, Ord)
+
+instance Show Name where
+  show (Name x) = show x
+
+instance IsString Name where
+  fromString s = Name $ fromString s
 
 data Argument = Argument
   { defaultLit :: Maybe Literal,

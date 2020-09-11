@@ -56,7 +56,7 @@ term =
       Lit <$> literal
     ]
   where
-    function = try $ Fun <$> identifier <*> parens (sepBy expr comma)
+    function = try $ Fun <$> name <*> parens (sepBy expr comma)
 
 literal :: Parser Literal
 literal =
@@ -67,11 +67,14 @@ literal =
       Lit.Int <$> natural
     ]
 
+name :: Parser Name
+name = Name <$> identifier
+
 variable :: Parser Expr
-variable = Var <$> identifier
+variable = Var <$> name
 
 reference :: Parser Expr
-reference = char '&' >> Ref <$> identifier
+reference = char '&' >> Ref <$> name
 
 table :: [[Operator Parser Expr]]
 table =
@@ -102,12 +105,12 @@ value =
 
 arg :: Parser (Name, Argument)
 arg = do
-  name <- identifier
+  n <- name
   mtype <- optional $ symbol ":" >> parseType
   def <- optional $ symbol "=" >> literal
   desc <- optional (Text.pack <$> (char '(' >> manyTill charLiteral (char ')')))
   let t = fromMaybe Type.Real $ mtype <|> Lit.type' <$> def
-  pure $ (name, Argument {argType = t, defaultLit = def, description = desc})
+  pure $ (n, Argument {argType = t, defaultLit = def, description = desc})
 
 parseType :: Parser Type
 parseType =
@@ -156,9 +159,9 @@ statement =
       sThen <- statement
       sElse <- optional $ reserved "Else" *> statement
       pure $ If (lhs, ord, rhs) sThen sElse
-    label = Label <$> identifier <* symbol ":"
+    label = Label <$> name <* symbol ":"
     assignment = do
-      var <- identifier
+      var <- name
       _ <- symbol "="
       e <- expr
       pure $ Assign var e
@@ -166,7 +169,7 @@ statement =
     unsafe =
       Unsafe . Text.pack
         <$> (symbol "!" *> manyTill charLiteral (lookAhead (semicolon <|> eol)))
-    jump = symbol "JUMP" >> Jump <$> identifier
+    jump = symbol "JUMP" >> Jump <$> name
 
 code :: Parser (Code Expr)
 code = Code <$> takeWhile1P (Just "address") isUpper <*> value

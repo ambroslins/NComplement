@@ -3,7 +3,6 @@ module Gen
     Env (variables, labels),
     Variable (..),
     Index,
-    unIndex,
     RecordNumber,
     runGenerator,
     emptyEnv,

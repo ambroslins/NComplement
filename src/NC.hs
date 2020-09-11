@@ -4,7 +4,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Literal (Literal)
 import qualified Literal as Lit
-import Syntax (Code (..), Value (..))
+import Syntax (Code (..), Name (..), Value (..))
 
 data Statement
   = Codes [Code Expr]
@@ -13,7 +13,7 @@ data Statement
   | IF (Expr, Ordering, Expr) (Maybe RecordNumber, Maybe RecordNumber)
   | JUMP RecordNumber
   | CRT Text
-  | Definiton Index (Either Int Double) Text
+  | Definiton Index (Either Int Double) Name
   | Escape Text
   deriving (Eq, Show)
 
@@ -40,7 +40,7 @@ printStmt = \case
       f = maybe "" showText
   JUMP rn -> "JUMP" <> showText rn
   CRT t -> "CRT" <> parens t
-  Definiton i _ desc -> "H" <> (showText i) <> "   =  " <> "+000000.0000" <> "  ( " <> Text.justifyLeft 43 ' ' desc <> ")"
+  Definiton i _ desc -> "H" <> (showText i) <> "   =  " <> "+000000.0000" <> "  ( " <> Text.justifyLeft 43 ' ' (unName desc) <> ")"
   Escape x -> x
 
 parens :: Text -> Text
@@ -107,7 +107,7 @@ showText = Text.pack . show
 pad0 :: Show a => Int -> a -> Text
 pad0 n = Text.justifyRight n '0' . showText
 
-newtype Index = Index {unIndex :: Int}
+newtype Index = Index Int
   deriving (Eq, Ord)
 
 instance Show Index where
