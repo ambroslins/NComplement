@@ -83,6 +83,7 @@ data Expr
   = Int Int
   | Real Double
   | Var Index
+  | Ref Index
   | Neg Expr
   | Add Expr Expr
   | Sub Expr Expr
@@ -96,6 +97,7 @@ printExpr = \case
   Int x -> showText x
   Real x -> showText x
   Var i -> "H" <> showText i
+  Ref i -> showText i
   Neg x -> "-" <> brackets (printExpr x)
   Add x y -> binary "+" x y
   Sub x y -> binary "-" x y

@@ -53,7 +53,7 @@ expr = \case
     pure (type' var, NC.Var (index var))
   Ref name -> do
     var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
-    pure (type' var, NC.Int (unIndex $ index var))
+    pure (Type.Int, NC.Ref (index var))
   Fun name args ->
     maybe
       (throwError $ UndefinedFun name)
@@ -160,12 +160,11 @@ statement stmt = do
           statement elses
           emit $ NC.N rn2
     Scope stmts -> mapM_ statement stmts
-    Unsafe x ->
-      emit
-        =<< ( fmap (NC.Escape . Text.concat) $
-                mapM (either pure (fmap (Text.pack . show . snd) . expr)) $
-                  splitCap (Parser.reference <|> Parser.variable) x
-            )
+    Unsafe x -> do
+      xs <-
+        mapM (either pure (fmap (NC.printExpr . snd) . expr)) $
+          splitCap (Parser.reference <|> Parser.variable) x
+      emit $ NC.Escape $ Text.concat xs
     Label name -> do
       ls <- gets labels
       when (Map.member name ls) $ throwError $ Error
@@ -198,18 +197,23 @@ instr = \case
   G 4 : xs -> case xs of
     [X x] -> sequence $ [pure $ NC.G 4, NC.X <$> requireType Type.Real x]
     _ -> throwError $ Error
-  G 80 : xs -> forM xs axis
-  G 82 : xs -> forM xs axis
-  G 83 : xs -> forM xs $ \case
-    X x -> NC.X <$> requireType Type.Int x
-    Y x -> NC.Y <$> requireType Type.Int x
-    Z x -> NC.Z <$> requireType Type.Int x
-    U x -> NC.U <$> requireType Type.Int x
-    V x -> NC.V <$> requireType Type.Int x
-    B x -> NC.B <$> requireType Type.Int x
-    E x -> NC.E <$> requireType Type.Int x
-    I x -> NC.I <$> requireType Type.Int x
-    _ -> throwError $ Error
+  G 80 : xs -> (NC.G 80 :) <$> forM xs axis
+  G 82 : xs -> (NC.G 82 :) <$> forM xs axis
+  G 83 : xs ->
+    (NC.G 83 :)
+      <$> forM
+        xs
+        ( \case
+            X x -> NC.X <$> requireType Type.Int x
+            Y x -> NC.Y <$> requireType Type.Int x
+            Z x -> NC.Z <$> requireType Type.Int x
+            U x -> NC.U <$> requireType Type.Int x
+            V x -> NC.V <$> requireType Type.Int x
+            B x -> NC.B <$> requireType Type.Int x
+            E x -> NC.E <$> requireType Type.Int x
+            I x -> NC.I <$> requireType Type.Int x
+            _ -> throwError $ Error
+        )
   G g : cs | Set.member g modalG -> (NC.G g :) <$> (instr cs)
   _ -> throwError Error
   where
