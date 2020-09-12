@@ -168,38 +168,48 @@ statement stmt = do
           . Map.lookup name
           . labels
     Codes cs -> emit =<< NC.Codes <$> instr (toList cs)
-    Get name address -> do
-      let getters =
-            Map.fromList $
-              [ ("X", Type.Real),
-                ("Y", Type.Real),
-                ("Z", Type.Real),
-                ("U", Type.Real),
-                ("V", Type.Real),
-                ("I", Type.Int),
-                ("E", Type.Int)
-              ]
-      case Map.lookup address getters of
-        Nothing -> throwError $ Error
-        Just t -> do
-          var <- insertVar name t
-          emit $ NC.Codes [NC.g 83, Code address (Expr $ NC.Ref (index var))]
-    Set address x -> do
-      let setters =
-            Map.fromList $
-              [ ("X", Type.Real),
-                ("Y", Type.Real),
-                ("Z", Type.Real),
-                ("U", Type.Real),
-                ("V", Type.Real)
-              ]
-      case Map.lookup address setters of
-        Nothing -> throwError $ Error
-        Just t -> do
-          (t', x') <- expr x
-          if t == t'
-            then emit $ NC.Codes [NC.g 92, Code address (Expr x')]
-            else throwError $ Error
+    Get names address -> do
+      xs <- f (toList names) (toList address)
+      emit $ NC.Codes (NC.g 83 : xs)
+      where
+        f [] [] = pure []
+        f (n : ns) (a : as) = case Map.lookup a getters of
+          Nothing -> throwError $ Error
+          Just t -> do
+            var <- insertVar n t
+            (Code a (Expr $ NC.Ref (index var)) :) <$> f ns as
+        f _ _ = throwError Error
+        getters =
+          Map.fromList $
+            [ ("X", Type.Real),
+              ("Y", Type.Real),
+              ("Z", Type.Real),
+              ("U", Type.Real),
+              ("V", Type.Real),
+              ("I", Type.Int),
+              ("E", Type.Int)
+            ]
+    Set address exprs -> do
+      xs <- f (toList address) (toList exprs)
+      emit $ NC.Codes (NC.g 92 : xs)
+      where
+        f [] [] = pure []
+        f (a : as) (e : es) = case Map.lookup a setters of
+          Nothing -> throwError $ Error
+          Just t -> do
+            (t', e') <- expr e
+            if t == t'
+              then (Code a (Expr e') :) <$> f as es
+              else throwError $ Error
+        f _ _ = throwError $ Error
+        setters =
+          Map.fromList $
+            [ ("X", Type.Real),
+              ("Y", Type.Real),
+              ("Z", Type.Real),
+              ("U", Type.Real),
+              ("V", Type.Real)
+            ]
   where
     insertVar name t = do
       vars <- gets variables

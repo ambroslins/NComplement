@@ -9,7 +9,10 @@ import Control.Monad.Combinators
     (<|>),
   )
 import Control.Monad.Combinators.Expr
-import Control.Monad.Combinators.NonEmpty (some)
+import Control.Monad.Combinators.NonEmpty
+  ( sepBy1,
+    some,
+  )
 import Data.Char (isSpace, isUpper)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
@@ -162,8 +165,8 @@ statement =
       sElse <- optional $ reserved "Else" *> statement
       pure $ If (lhs, ord, rhs) sThen sElse
     label = Label <$> name <* symbol ":"
-    get = Get <$> try (name <* symbol "<-") <*> address
-    set = Set <$> try (address <* symbol "<-") <*> expr
+    get = Get <$> try (sepBy1 name comma <* symbol "<-") <*> sepBy1 address comma
+    set = Set <$> try (sepBy1 address comma <* symbol "<-") <*> sepBy1 expr comma
     assignment = do
       var <- name
       _ <- symbol "="
