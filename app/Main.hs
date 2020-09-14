@@ -1,16 +1,25 @@
 module Main where
 
-import Data.Bifunctor (first)
-import qualified Data.Text as Text
-import qualified Data.Text.IO as Text
+import Control.Exception
+import Data.Char (toUpper)
 import Error
-import Gen
-import qualified NC
-import qualified Generator
-import qualified Parser
-import Text.Megaparsec (parse)
+import NComplement
+import System.Environment
+import System.FilePath
 
 main :: IO ()
-main = Text.interact $ \input -> either (Text.pack . show) NC.printStmts $ do
-  ast <- first ParseError $ parse Parser.program "NC" input
-  runGenerator emptyEnv $ Generator.program ast
+main =
+  handle handler $
+    getArgs >>= \case
+      [inFilePath] ->
+        if ext == ".nco"
+          then compile inFilePath outFilePath
+          else throwIO Error
+        where
+          (file, ext) = splitExtension inFilePath
+          (path, name) = splitFileName file
+          outFilePath = path </> map toUpper name <.> ".NC"
+      _ -> throwIO Error
+  where
+    handler :: SomeException -> IO ()
+    handler e = print e

@@ -6,6 +6,7 @@ where
 import Data.Text (Text)
 import Data.Void (Void)
 import Text.Megaparsec.Error (ParseErrorBundle, errorBundlePretty)
+import Control.Exception(Exception(..))
 import Type (Type)
 import Syntax (Name)
 
@@ -17,6 +18,8 @@ data Error
   | TypeMismatch Type Type
   | ParseError (ParseErrorBundle Text Void)
   deriving (Eq)
+
+instance Exception Error
 
 instance Show Error where
   show = \case
