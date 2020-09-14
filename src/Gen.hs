@@ -1,22 +1,22 @@
 module Gen
   ( Gen,
-    Env (variables, labels),
+    Env (..),
+    Symbol (..),
     Variable (..),
-    Index,
-    RecordNumber,
+    Index (..),
+    Location (..),
     runGenerator,
     emptyEnv,
     get,
     gets,
     modify,
-    modifyVars,
-    modifyLabels,
+    modifySymbols,
     emit,
     emits,
     emitWithFuture,
     emitsWithFuture,
     nextIndex,
-    nextRecordNumber,
+    nextLocation,
     throwError,
   )
 where
@@ -27,25 +27,29 @@ import Control.Monad.Writer
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Error
-import NC (Index (..), RecordNumber (..), Statement)
-import Syntax (Name)
+import qualified NC
+import Syntax
 import Type (Type)
 
-type Gen = WriterT [Either Error Statement] (ExceptT Error (Tardis Env Env))
+type Gen = WriterT [Either Error NC.Statement] (ExceptT Error (Tardis Env Env))
 
-data Env = Env
-  { offsetIndex :: Index,
-    recordNumber :: RecordNumber,
-    variables :: Map Name Variable,
-    labels :: Map Name RecordNumber
-  }
+data Symbol
+  = Var Variable
+  | Loc Location
+  | Fun ([Expr] -> Gen (Type, NC.Expr))
 
 data Variable = Variable
-  { index :: Index,
-    type' :: Type
+  { typeof :: Type,
+    index :: Index
   }
 
-runGenerator :: Env -> Gen a -> Either Error [Statement]
+data Env = Env
+  { indices :: [Index],
+    locations :: [Location],
+    symbols :: Map Name Symbol
+  }
+
+runGenerator :: Env -> Gen a -> Either Error [NC.Statement]
 runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT . revert
   where
     foldEither [] = Right []
@@ -56,10 +60,9 @@ runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . r
 emptyEnv :: Env
 emptyEnv =
   Env
-    { offsetIndex = Index 0,
-      recordNumber = RecordNumber 0,
-      variables = Map.empty,
-      labels = Map.empty
+    { indices = Index <$> [100 .. 500],
+      locations = Location <$> [0, 10 .. 9000],
+      symbols = Map.empty
     }
 
 get :: Gen Env
@@ -71,32 +74,35 @@ gets = lift . lift . getsPast
 modify :: (Env -> Env) -> Gen ()
 modify = lift . lift . modifyForwards
 
-modifyVars :: (Map Name Variable -> Map Name Variable) -> Gen ()
-modifyVars f = modify $ \env -> env {variables = f (variables env)}
+modifySymbols :: (Map Name Symbol -> Map Name Symbol) -> Gen ()
+modifySymbols f = modify $ \env -> env {symbols = f (symbols env)}
 
-modifyLabels :: (Map Name RecordNumber -> Map Name RecordNumber) -> Gen ()
-modifyLabels f = modify $ \env -> env {labels = f (labels env)}
-
-emit :: Statement -> Gen ()
+emit :: NC.Statement -> Gen ()
 emit = tell . pure . pure
 
-emits :: [Statement] -> Gen ()
+emits :: [NC.Statement] -> Gen ()
 emits = mapM_ emit
 
-emitWithFuture :: (Env -> Either Error Statement) -> Gen ()
+emitWithFuture :: (Env -> Either Error NC.Statement) -> Gen ()
 emitWithFuture = emitsWithFuture . fmap pure
 
-emitsWithFuture :: (Env -> [Either Error Statement]) -> Gen ()
+emitsWithFuture :: (Env -> [Either Error NC.Statement]) -> Gen ()
 emitsWithFuture f = (lift $ lift $ getFuture) >>= tell . f
 
 nextIndex :: Gen Index
 nextIndex = do
-  Index i <- gets offsetIndex
-  modify $ \env -> env {offsetIndex = Index (1 + i)}
-  pure $ Index i
+  is <- gets indices
+  case is of
+    [] -> throwError Error
+    i : is' -> do
+      modify $ \env -> env {indices = is'}
+      pure i
 
-nextRecordNumber :: Gen RecordNumber
-nextRecordNumber = do
-  RecordNumber n <- gets recordNumber
-  modify $ \env -> env {recordNumber = RecordNumber (1 + n)}
-  pure $ RecordNumber n
+nextLocation :: Gen Location
+nextLocation = do
+  ls <- gets locations
+  case ls of
+    [] -> throwError Error
+    l : ls' -> do
+      modify $ \env -> env {locations = ls'}
+      pure l

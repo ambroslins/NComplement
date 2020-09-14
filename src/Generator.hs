@@ -1,16 +1,14 @@
 module Generator where
 
-import Control.Applicative ((<|>))
 import Control.Monad (when)
 import Data.Foldable (toList)
 import qualified Data.Map as Map
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as Text
 import Error
 import Gen
 import qualified Literal as Lit
 import qualified NC
-import qualified Parser
-import Replace.Megaparsec (splitCap)
 import Syntax
 import Type (Type)
 import qualified Type
@@ -25,39 +23,50 @@ defineArgs :: [(Name, Argument)] -> Gen ()
 defineArgs = mapM_ def
   where
     def (name, arg) = do
-      vars <- gets variables
+      vars <- gets symbols
       if name `Map.member` vars
         then throwError $ Error
         else do
           i <- nextIndex
-          let var = Variable {type' = argType arg, index = i}
-          modifyVars $ Map.insert name var
+          let var = Variable {typeof = argType arg, index = i}
+          modifySymbols $ Map.insert name (Var var)
           emit $ NC.Definiton i (Left 0) name
 
 defineVars :: Gen ()
 defineVars = do
-  prev <- gets variables
+  prev <- gets symbols
   emitsWithFuture $ \env ->
-    map
-      (pure . def)
-      (Map.toList (Map.difference (variables env) prev))
+    mapMaybe
+      ( \case
+          (n, Var var) -> Just $ pure $ def n var
+          _ -> Nothing
+      )
+      (Map.toList (Map.difference (symbols env) prev))
   where
-    def (name, var) = NC.Definiton (index var) (Left 0) name
+    def name var = NC.Definiton (index var) (Left 0) name
 
 expr :: Expr -> Gen (Type, NC.Expr)
 expr = \case
   Lit x -> pure (Lit.type' x, NC.fromLit x)
-  Var name -> do
-    var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
-    pure (type' var, NC.Var (index var))
+  Sym name -> do
+    syms <- gets symbols
+    case Map.lookup name syms of
+      Just (Var var) -> pure (typeof var, NC.Var (index var))
+      Just (Loc loc) -> pure (Type.Location, NC.Loc loc)
+      Just _ -> throwError Error
+      Nothing -> throwError $ UndefinedVar name
   Ref name -> do
-    var <- gets variables >>= maybe (throwError $ UndefinedVar name) pure . Map.lookup name
-    pure (Type.Int, NC.Ref (index var))
-  Fun name args ->
-    maybe
-      (throwError $ UndefinedFun name)
-      ($ args)
-      $ lookup name functions
+    syms <- gets symbols
+    case Map.lookup name syms of
+      Just (Var var) -> pure (Type.Index, NC.Ref (index var))
+      Just _ -> throwError Error
+      Nothing -> throwError $ UndefinedVar name
+  App name args -> do
+    syms <- gets symbols
+    case Map.lookup name syms of
+      Just (Fun f) -> f args
+      Just _ -> throwError Error
+      Nothing -> throwError $ UndefinedFun name
   Neg x -> do
     (t, e) <- expr x
     case t of
@@ -115,7 +124,7 @@ functions =
     ( "norm",
       \xs -> case map (Pow 2) xs of
         [] -> throwError $ Error
-        x : xs' -> expr $ Fun "sqrt" $ [foldl Add x xs']
+        x : xs' -> expr $ App "sqrt" $ [foldl Add x xs']
     )
   ]
   where
@@ -123,7 +132,7 @@ functions =
       [x] -> do
         (t, e) <- expr x
         case t of
-          Type.Real -> pure $ (Type.Real, NC.Fun f e)
+          Type.Real -> pure $ (Type.Real, NC.App f e)
           _ -> throwError $ TypeMismatch t Type.Real
       _ -> throwError $ Error
 
@@ -132,41 +141,34 @@ statement stmt = do
   case stmt of
     Assign name x -> do
       (t, e) <- expr x
-      var <- insertVar name t
+      var <- defineVar name t
       emit $ NC.Assign (index var) e
     If (lhs, ord, rhs) thens melses -> do
       (tl, el) <- expr lhs
       (tr, er) <- expr rhs
       when (tl /= tr) $ throwError $ Error
-      rn1 <- nextRecordNumber
-      emit $ NC.IF (el, ord, er) (Nothing, Just rn1)
+      l1 <- nextLocation
+      emit $ NC.IF (el, ord, er) (Nothing, Just l1)
       statement thens
       case melses of
-        Nothing -> emit $ NC.N rn1
+        Nothing -> emit $ NC.Codes [NC.n l1]
         Just elses -> do
-          rn2 <- nextRecordNumber
-          emits $ [NC.JUMP rn2, NC.N rn1]
+          l2 <- nextLocation
+          emits $ NC.Codes . pure <$> [NC.jump l2, NC.n l1]
           statement elses
-          emit $ NC.N rn2
+          emit $ NC.Codes [NC.n l2]
     Scope stmts -> mapM_ statement stmts
     Unsafe x -> do
-      xs <-
-        mapM (either pure (fmap (NC.printExpr . snd) . expr)) $
-          splitCap (Parser.reference <|> Parser.variable) x
+      xs <- mapM (either pure (fmap (NC.toText . snd) . expr)) x
       emit $ NC.Escape $ Text.concat xs
     Label name -> do
-      ls <- gets labels
-      when (Map.member name ls) $ throwError $ Error
-      rn <- nextRecordNumber
-      modifyLabels $ Map.insert name rn
-      emit $ NC.N rn
-    Jump name ->
-      emitWithFuture $
-        maybe
-          (Left $ UndefinedLabel name)
-          (Right . NC.JUMP)
-          . Map.lookup name
-          . labels
+      syms <- gets symbols
+      if name `Map.member` syms
+        then throwError $ Error
+        else do
+          loc <- nextLocation
+          modifySymbols $ Map.insert name (Loc loc)
+          emit $ NC.Codes [NC.n loc, NC.Comment $ unName name]
     Codes cs -> emit =<< NC.Codes <$> instr (toList cs)
     Get names address -> do
       xs <- f (toList names) (toList address)
@@ -176,8 +178,8 @@ statement stmt = do
         f (n : ns) (a : as) = case Map.lookup a getters of
           Nothing -> throwError $ Error
           Just t -> do
-            var <- insertVar n t
-            (Code a (Expr $ NC.Ref (index var)) :) <$> f ns as
+            var <- defineVar n t
+            (NC.Code a (NC.Ref (index var)) :) <$> f ns as
         f _ _ = throwError Error
         getters =
           Map.fromList $
@@ -199,7 +201,7 @@ statement stmt = do
           Just t -> do
             (t', e') <- expr e
             if t == t'
-              then (Code a (Expr e') :) <$> f as es
+              then (NC.Code a e' :) <$> f as es
               else throwError $ Error
         f _ _ = throwError $ Error
         setters =
@@ -211,19 +213,18 @@ statement stmt = do
               ("V", Type.Real)
             ]
   where
-    insertVar name t = do
-      vars <- gets variables
-      case Map.lookup name vars of
+    defineVar name t = do
+      syms <- gets symbols
+      case Map.lookup name syms of
         Nothing -> do
           i <- nextIndex
-          let v = Variable {index = i, type' = t}
-          modifyVars $ Map.insert name v
-          pure v
-        Just v -> do
-          when (type' v /= t) $ throwError $ Error
-          pure v
+          let var = Variable {typeof = t, index = i}
+          modifySymbols $ Map.insert name (Var var)
+          pure var
+        Just (Var var) -> do
+          when (typeof var /= t) $ throwError $ Error
+          pure var
+        Just _ -> throwError $ Error
 
-instr :: [Code Expr] -> Gen [Code NC.Expr]
-instr = mapM $ \case
-  Code adr (Val x) -> pure $ Code adr (Val x)
-  Code adr (Expr x) -> Code adr . Expr . snd <$> expr x
+instr :: [Code] -> Gen [NC.Code]
+instr = mapM $ \(Code adr x) -> NC.Code adr . snd <$> expr x

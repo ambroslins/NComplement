@@ -13,21 +13,19 @@ import Control.Monad.Combinators.NonEmpty
   ( sepBy1,
     some,
   )
-import Data.Char (isSpace, isUpper)
+import Data.Char (isUpper)
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer
 import Literal (Literal)
 import qualified Literal as Lit
+import Replace.Megaparsec (splitCap)
 import Syntax
 import Text.Megaparsec
   ( eof,
-    lookAhead,
-    match,
-    notFollowedBy,
-    oneOf,
     sepBy,
     takeWhile1P,
+    takeWhileP,
     try,
     (<?>),
   )
@@ -53,81 +51,75 @@ term :: Parser Expr
 term =
   choice
     [ parens expr,
-      function,
+      application,
       reference,
-      variable,
+      symbol,
       Lit <$> literal
     ]
   where
-    function = try $ Fun <$> name <*> parens (sepBy expr comma)
+    application = try $ App <$> name <*> parens (sepBy expr comma)
 
 literal :: Parser Literal
 literal =
   choice
-    [ Lit.Bool True <$ symbol "True",
-      Lit.Bool False <$ symbol "False",
+    [ Lit.Bool True <$ reserved "True",
+      Lit.Bool False <$ reserved "False",
       Lit.Real <$> try real,
-      Lit.Int <$> natural
+      Lit.Int <$> natural,
+      Lit.String . Text.pack <$> (char '"' *> manyTill charLiteral (char '"'))
     ]
 
 name :: Parser Name
 name = Name <$> identifier
 
-variable :: Parser Expr
-variable = Var <$> name
+symbol :: Parser Expr
+symbol = Sym <$> name
 
 reference :: Parser Expr
 reference = char '&' >> Ref <$> name
 
 table :: [[Operator Parser Expr]]
 table =
-  [ [ prefix "-" Neg,
-      prefix "+" id
+  [ [ prefix minus Neg,
+      prefix plus id
     ],
-    [ Postfix (Pow <$> (symbol "^" *> integer))
+    [ Postfix (Pow <$> (circumflex *> integer))
     ],
-    [ infixLeft "*" (Mul),
-      infixLeft "/" (Div)
+    [ infixLeft asterisk Mul,
+      infixLeft slash Div
     ],
-    [ infixLeft "+" (Add),
-      infixLeft "-" (Sub)
+    [ infixLeft plus Add,
+      infixLeft minus Sub
     ]
   ]
   where
-    prefix sym f = Prefix (f <$ symbol sym <* notFollowedBy (oneOf ['-', '+']))
-    infixLeft sym f = InfixL (f <$ symbol sym)
-
-value :: Parser (Value Expr)
-value =
-  match expr
-    >>= pure . \case
-      (v, Lit (Lit.Int _)) -> Val $ Text.takeWhile (not . isSpace) v
-      (_, x) -> Expr x
+    prefix p f = Prefix (f <$ p)
+    infixLeft p f = InfixL (f <$ p)
 
 -- Arguments
 
 arg :: Parser (Name, Argument)
 arg = do
   n <- name
-  mtype <- optional $ symbol ":" >> parseType
-  def <- optional $ symbol "=" >> literal
+  mtype <- optional $ colon >> parseType
+  def <- optional $ equal >> literal
   desc <- optional (Text.pack <$> (char '(' >> manyTill charLiteral (char ')')))
   let t = fromMaybe Type.Real $ mtype <|> Lit.type' <$> def
-  pure $ (n, Argument {argType = t, defaultLit = def, description = desc})
+  pure $ (n, Argument {argType = t, argDefault = def, description = desc})
 
 parseType :: Parser Type
 parseType =
   choice
-    [ Type.Real <$ symbol "Real",
-      Type.Int <$ symbol "Int",
-      Type.Bool <$ symbol "Bool"
+    [ Type.Real <$ reserved "Real",
+      Type.Int <$ reserved "Int",
+      Type.Bool <$ reserved "Bool"
     ]
 
 args :: Parser [(Name, Argument)]
 args =
-  symbol "Args"
-    >> parens (sepBy arg sep)
-    <* some (lexeme (semicolon <|> eol))
+  lexeme' $
+    reserved "Args"
+      >> parens (sepBy arg sep)
   where
     sep = comma >> many (lexeme eol)
 
@@ -147,7 +139,6 @@ statement =
         assignment,
         scope,
         unsafe,
-        jump,
         Codes <$> some code
       ]
   where
@@ -156,30 +147,27 @@ statement =
       lhs <- expr
       ord <-
         choice
-          [ EQ <$ symbol "=",
-            LT <$ symbol "<",
-            GT <$ symbol ">"
+          [ EQ <$ equal,
+            LT <$ lessThan,
+            GT <$ greaterThan
           ]
       rhs <- expr
       sThen <- statement
       sElse <- optional $ reserved "Else" *> statement
       pure $ If (lhs, ord, rhs) sThen sElse
-    label = Label <$> name <* symbol ":"
-    get = Get <$> try (sepBy1 name comma <* symbol "<-") <*> sepBy1 address comma
-    set = Set <$> try (sepBy1 address comma <* symbol "<-") <*> sepBy1 expr comma
+    label = Label <$> name <* colon
+    get = Get <$> try (sepBy1 name comma <* leftArrow) <*> sepBy1 address comma
+    set = Set <$> try (sepBy1 address comma <* leftArrow) <*> sepBy1 expr comma
     assignment = do
       var <- name
-      _ <- symbol "="
+      equal
       e <- expr
       pure $ Assign var e
     scope = Scope <$> braces statements
     unsafe =
-      Unsafe . Text.pack
-        <$> (symbol "!" *> manyTill charLiteral (lookAhead (semicolon <|> eol)))
-    jump = symbol "JUMP" >> Jump <$> name
-
-code :: Parser (Code Expr)
-code = Code <$> address <*> value
+      Unsafe . splitCap (reference <|> symbol)
+        <$> (exclamation *> takeWhileP Nothing (not . (`elem` [';', '\n'])))
+    code = Code <$> address <*> expr
 
 address :: Parser Address
-address = lexeme $ takeWhile1P (Just "address") isUpper
+address = lexeme $ Address <$> takeWhile1P (Just "address") isUpper

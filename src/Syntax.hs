@@ -6,17 +6,8 @@ import Data.Text (Text)
 import Literal (Literal)
 import Type (Type)
 
-newtype Name = Name {unName :: Text}
-  deriving (Eq, Ord)
-
-instance Show Name where
-  show (Name x) = show x
-
-instance IsString Name where
-  fromString s = Name $ fromString s
-
 data Argument = Argument
-  { defaultLit :: Maybe Literal,
+  { argDefault :: Maybe Literal,
     argType :: Type,
     description :: Maybe Text
   }
@@ -28,9 +19,9 @@ data Program = Program
 
 data Expr
   = Lit Literal
-  | Var Name
+  | Sym Name
   | Ref Name
-  | Fun Name [Expr]
+  | App Name [Expr]
   | Neg Expr
   | Add Expr Expr
   | Sub Expr Expr
@@ -41,20 +32,32 @@ data Expr
 
 data Statement
   = Assign Name Expr
-  | If (Expr, Ordering, Expr) Statement (Maybe Statement)
-  | Scope [Statement]
-  | Unsafe Text
-  | Label Name
-  | Jump Name
-  | Codes (NonEmpty (Code Expr))
   | Get (NonEmpty Name) (NonEmpty Address)
   | Set (NonEmpty Address) (NonEmpty Expr)
+  | Scope [Statement]
+  | Unsafe [Either Text Expr]
+  | Codes (NonEmpty Code)
+  | If (Expr, Ordering, Expr) Statement (Maybe Statement)
+  | Label Name
   deriving (Eq, Show)
 
-data Code a = Code Address (Value a)
+data Code = Code Address Expr
   deriving (Eq, Show)
 
-type Address = Text
+newtype Name = Name {unName :: Text}
+  deriving (Eq, Ord, Show)
 
-data Value a = Val Text | Expr a
-  deriving (Eq, Show)
+instance IsString Name where
+  fromString s = Name $ fromString s
+
+newtype Address = Address Text
+  deriving (Eq, Ord, Show)
+
+instance IsString Address where
+  fromString s = Address $ fromString s
+
+newtype Index = Index Int
+  deriving (Eq, Ord, Show)
+
+newtype Location = Location Int
+  deriving (Eq, Ord, Show)

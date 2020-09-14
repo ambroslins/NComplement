@@ -4,7 +4,6 @@ module Lexer
     scn,
     lexeme,
     lexeme',
-    symbol,
     identifier,
     reserved,
     natural,
@@ -13,7 +12,18 @@ module Lexer
     parens,
     braces,
     semicolon,
+    colon,
     comma,
+    exclamation,
+    plus,
+    minus,
+    asterisk,
+    slash,
+    circumflex,
+    lessThan,
+    equal,
+    greaterThan,
+    leftArrow,
     Lex.charLiteral,
   )
 where
@@ -48,8 +58,8 @@ lexeme = Lex.lexeme sc
 lexeme' :: Parser a -> Parser a
 lexeme' = Lex.lexeme scn
 
-symbol :: Text -> Parser Text
-symbol = Lex.symbol sc
+symbol :: Text -> Parser ()
+symbol = void . Lex.symbol sc
 
 identEnd :: Parser Char
 identEnd = alphaNumChar <|> oneOf ['_', '\'']
@@ -78,8 +88,41 @@ parens = between (symbol "(") (symbol ")")
 braces :: Parser a -> Parser a
 braces = between (Lex.symbol scn "{") (Lex.symbol scn "}")
 
-semicolon :: Parser Text
+semicolon :: Parser ()
 semicolon = symbol ";"
 
-comma :: Parser Text
+colon :: Parser ()
+colon = symbol ":"
+
+comma :: Parser ()
 comma = symbol ","
+
+exclamation :: Parser ()
+exclamation = symbol "!"
+
+plus :: Parser ()
+plus = symbol "+"
+
+minus :: Parser ()
+minus = symbol "-"
+
+asterisk :: Parser ()
+asterisk = symbol "*"
+
+slash :: Parser ()
+slash = symbol "/"
+
+circumflex :: Parser ()
+circumflex = symbol "^"
+
+lessThan :: Parser ()
+lessThan = symbol "<"
+
+equal :: Parser ()
+equal = symbol "="
+
+greaterThan :: Parser ()
+greaterThan = symbol ">"
+
+leftArrow :: Parser ()
+leftArrow = symbol "<-"
