@@ -6,7 +6,8 @@ module Gen
     Index (..),
     Location (..),
     runGenerator,
-    emptyEnv,
+    setSourceLine,
+    throwE,
     get,
     gets,
     modify,
@@ -17,7 +18,6 @@ module Gen
     emitsWithFuture,
     nextIndex,
     nextLocation,
-    throwError,
   )
 where
 
@@ -25,8 +25,10 @@ import Control.Monad.Except
 import Control.Monad.Tardis
 import Control.Monad.Writer
 import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Text (Text)
+import qualified Data.Text as Text
 import Error
+import Located
 import qualified NC
 import Syntax
 import Type (Type)
@@ -46,10 +48,12 @@ data Variable = Variable
 data Env = Env
   { indices :: [Index],
     locations :: [Location],
+    source :: Text,
+    currentLine :: Pos,
     symbols :: Map Name Symbol
   }
 
-runGenerator :: Env -> Gen a -> Either Error [NC.Statement]
+runGenerator :: Env -> Gen () -> Either Error [NC.Statement]
 runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT . revert
   where
     foldEither [] = Right []
@@ -57,13 +61,15 @@ runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . r
     foldEither (Right x : xs) = (x :) <$> foldEither xs
     revert = (>> (lift $ lift $ getPast >>= sendPast))
 
-emptyEnv :: Env
-emptyEnv =
-  Env
-    { indices = Index <$> [100 .. 500],
-      locations = Location <$> [0, 10 .. 9000],
-      symbols = Map.empty
-    }
+setSourceLine :: Pos -> Gen ()
+setSourceLine p = modify $ \env -> env {currentLine = p}
+
+throwE :: Error' -> Gen a
+throwE err = do
+  pos <- gets currentLine
+  src <- gets source
+  let line = Text.lines src !! (unPos pos - 1)
+  throwError $ CompileError pos line err
 
 get :: Gen Env
 get = gets id
@@ -93,7 +99,7 @@ nextIndex :: Gen Index
 nextIndex = do
   is <- gets indices
   case is of
-    [] -> throwError Error
+    [] -> throwE Error
     i : is' -> do
       modify $ \env -> env {indices = is'}
       pure i
@@ -102,7 +108,7 @@ nextLocation :: Gen Location
 nextLocation = do
   ls <- gets locations
   case ls of
-    [] -> throwError Error
+    [] -> throwE Error
     l : ls' -> do
       modify $ \env -> env {locations = ls'}
       pure l

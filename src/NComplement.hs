@@ -9,7 +9,7 @@ import qualified Generator
 import qualified NC
 import qualified Parser
 import System.FilePath
-import Text.Megaparsec (parse)
+import Text.Megaparsec (parse, pos1)
 
 runCompiler :: FilePath -> FilePath -> IO ()
 runCompiler inFilePath outFilePath = do
@@ -27,4 +27,13 @@ compile inFilePath input =
     Left e -> Left $ ParseError e
     Right ast ->
       NC.printStmts
-        <$> runGenerator emptyEnv (Generator.program ast)
+        <$> runGenerator env (Generator.program ast)
+  where
+    env =
+      Env
+        { indices = Index <$> [100 .. 700],
+          locations = Location <$> [0, 10, 9000],
+          source = input,
+          currentLine = pos1,
+          symbols = mempty
+        }

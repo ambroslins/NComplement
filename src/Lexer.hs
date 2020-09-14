@@ -1,5 +1,6 @@
 module Lexer
   ( Parser,
+    getSourceLine,
     sc,
     scn,
     lexeme,
@@ -37,6 +38,9 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lex
 
 type Parser = Parsec Void Text
+
+getSourceLine :: Parser Pos
+getSourceLine = sourceLine <$> getSourcePos
 
 sc :: Parser ()
 sc =

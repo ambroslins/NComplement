@@ -4,6 +4,7 @@ import Data.List.NonEmpty (NonEmpty)
 import Data.String (IsString (..))
 import Data.Text (Text)
 import Literal (Literal)
+import Located
 import Type (Type)
 
 data Argument = Argument
@@ -35,7 +36,9 @@ data Sign
   | Minus
   deriving (Eq, Show)
 
-data Statement
+type Statement = Located Statement'
+
+data Statement'
   = Assign Name Expr
   | Get (NonEmpty Name) (NonEmpty Address)
   | Set (NonEmpty Address) (NonEmpty Expr)

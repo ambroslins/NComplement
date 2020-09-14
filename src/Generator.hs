@@ -8,6 +8,7 @@ import qualified Data.Text as Text
 import Error
 import Gen
 import qualified Literal as Lit
+import Located
 import qualified NC
 import Syntax
 import Type (Type)
@@ -25,7 +26,7 @@ defineArgs = mapM_ def
     def (name, arg) = do
       vars <- gets symbols
       if name `Map.member` vars
-        then throwError $ Error
+        then throwE $ Error
         else do
           i <- nextIndex
           let var = Variable {typeof = argType arg, index = i}
@@ -53,26 +54,26 @@ expr = \case
     case Map.lookup name syms of
       Just (Var var) -> pure (typeof var, NC.Var (index var))
       Just (Loc loc) -> pure (Type.Location, NC.Loc loc)
-      Just _ -> throwError Error
-      Nothing -> throwError $ UndefinedVar name
+      Just _ -> throwE Error
+      Nothing -> throwE $ UndefinedVar name
   Ref name -> do
     syms <- gets symbols
     case Map.lookup name syms of
       Just (Var var) -> pure (Type.Index, NC.Ref (index var))
-      Just _ -> throwError Error
-      Nothing -> throwError $ UndefinedVar name
+      Just _ -> throwE Error
+      Nothing -> throwE $ UndefinedVar name
   App name args -> do
     syms <- gets symbols
     case Map.lookup name syms of
       Just (Fun f) -> f args
-      Just _ -> throwError Error
-      Nothing -> throwError $ UndefinedFun name
+      Just _ -> throwE Error
+      Nothing -> throwE $ UndefinedFun name
   Neg x -> do
     (t, e) <- expr x
     case t of
       Type.Int -> pure (Type.Int, NC.Neg e)
       Type.Real -> pure (Type.Real, NC.Neg e)
-      _ -> throwError $ TypeMismatch t Type.Real
+      _ -> throwE $ TypeMismatch t Type.Real
   Add x y -> additive NC.Add x y
   Sub x y -> additive NC.Sub x y
   Mul x y -> do
@@ -83,7 +84,7 @@ expr = \case
       (Type.Int, Type.Real) -> pure (Type.Real, NC.Mul ex ey)
       (Type.Real, Type.Int) -> pure (Type.Real, NC.Mul ex ey)
       (Type.Real, Type.Real) -> pure (Type.Real, NC.Div (NC.Mul ex ey) (NC.Real 1.0))
-      _ -> throwError $ TypeMismatch tx ty
+      _ -> throwE $ TypeMismatch tx ty
   Div x y -> do
     (tx, ex) <- expr x
     (ty, ey) <- expr y
@@ -91,7 +92,7 @@ expr = \case
       (Type.Int, Type.Int) -> pure (Type.Int, NC.Div ex ey)
       (Type.Real, Type.Int) -> pure (Type.Real, NC.Div ex ey)
       (Type.Real, Type.Real) -> pure (Type.Real, NC.Mul (NC.Div ex ey) (NC.Real 1.0))
-      _ -> throwError $ TypeMismatch tx ty
+      _ -> throwE $ TypeMismatch tx ty
   Pow n e ->
     expr $
       ( if n < 0
@@ -108,7 +109,7 @@ expr = \case
       t <- case (tx, ty) of
         (Type.Int, Type.Int) -> pure Type.Int
         (Type.Real, Type.Real) -> pure Type.Real
-        _ -> throwError $ TypeMismatch tx ty
+        _ -> throwE $ TypeMismatch tx ty
       pure (t, f ex ey)
 
 functions :: [(Name, [Expr] -> Gen (Type, NC.Expr))]
@@ -123,7 +124,7 @@ functions =
     ("round", included NC.ROUND),
     ( "norm",
       \xs -> case map (Pow 2) xs of
-        [] -> throwError $ Error
+        [] -> throwE $ Error
         x : xs' -> expr $ App "sqrt" $ [foldl Add x xs']
     )
   ]
@@ -133,11 +134,12 @@ functions =
         (t, e) <- expr x
         case t of
           Type.Real -> pure $ (Type.Real, NC.App f e)
-          _ -> throwError $ TypeMismatch t Type.Real
-      _ -> throwError $ Error
+          _ -> throwE $ TypeMismatch t Type.Real
+      _ -> throwE $ Error
 
 statement :: Statement -> Gen ()
-statement stmt = do
+statement (At pos stmt) = do
+  setSourceLine pos
   case stmt of
     Assign name x -> do
       (t, e) <- expr x
@@ -146,7 +148,7 @@ statement stmt = do
     If (lhs, ord, rhs) thens melses -> do
       (tl, el) <- expr lhs
       (tr, er) <- expr rhs
-      when (tl /= tr) $ throwError $ Error
+      when (tl /= tr) $ throwE $ Error
       l1 <- nextLocation
       emit $ NC.IF (el, ord, er) (Nothing, Just l1)
       statement thens
@@ -164,7 +166,7 @@ statement stmt = do
     Label name -> do
       syms <- gets symbols
       if name `Map.member` syms
-        then throwError $ Error
+        then throwE $ Error
         else do
           loc <- nextLocation
           modifySymbols $ Map.insert name (Loc loc)
@@ -176,11 +178,11 @@ statement stmt = do
       where
         f [] [] = pure []
         f (n : ns) (a : as) = case Map.lookup a getters of
-          Nothing -> throwError $ Error
+          Nothing -> throwE $ Error
           Just t -> do
             var <- defineVar n t
             (NC.Code a (NC.Ref (index var)) :) <$> f ns as
-        f _ _ = throwError Error
+        f _ _ = throwE Error
         getters =
           Map.fromList $
             [ ("X", Type.Real),
@@ -197,13 +199,13 @@ statement stmt = do
       where
         f [] [] = pure []
         f (a : as) (e : es) = case Map.lookup a setters of
-          Nothing -> throwError $ Error
+          Nothing -> throwE $ Error
           Just t -> do
             (t', e') <- expr e
             if t == t'
               then (NC.Code a e' :) <$> f as es
-              else throwError $ Error
-        f _ _ = throwError $ Error
+              else throwE $ Error
+        f _ _ = throwE $ Error
         setters =
           Map.fromList $
             [ ("X", Type.Real),
@@ -222,9 +224,9 @@ statement stmt = do
           modifySymbols $ Map.insert name (Var var)
           pure var
         Just (Var var) -> do
-          when (typeof var /= t) $ throwError $ Error
+          when (typeof var /= t) $ throwE $ Error
           pure var
-        Just _ -> throwError $ Error
+        Just _ -> throwE $ Error
 
 instr :: [Code] -> Gen [NC.Code]
 instr = mapM $ \(Code adr x) -> NC.Code adr . snd <$> expr x

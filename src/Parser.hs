@@ -19,6 +19,7 @@ import qualified Data.Text as Text
 import Lexer
 import Literal (Literal)
 import qualified Literal as Lit
+import Located
 import Replace.Megaparsec (splitCap)
 import Syntax
 import Text.Megaparsec
@@ -103,10 +104,10 @@ arg = do
   n <- name
   mtype <- optional $ colon >> parseType
   def <- optional $ do
-        equal
-        sign <- option Plus (Minus <$ minus <|> Plus <$ plus)
-        lit <- literal
-        pure (sign, lit)
+    equal
+    sign <- option Plus (Minus <$ minus <|> Plus <$ plus)
+    lit <- literal
+    pure (sign, lit)
   desc <- optional (Text.pack <$> (char '(' >> manyTill charLiteral (char ')')))
   let t = fromMaybe Type.Real $ mtype <|> Lit.type' . snd <$> def
   pure $ (n, Argument {argType = t, argDefault = def, description = desc})
@@ -135,16 +136,17 @@ statements = many statement
 statement :: Parser Statement
 statement =
   lexeme' $
-    choice
-      [ ifStatement,
-        try label,
-        get,
-        set,
-        assignment,
-        scope,
-        unsafe,
-        Codes <$> some code
-      ]
+    At <$> getSourceLine
+      <*> choice
+        [ ifStatement,
+          try label,
+          get,
+          set,
+          assignment,
+          scope,
+          unsafe,
+          Codes <$> some code
+        ]
   where
     ifStatement = do
       reserved "If"
