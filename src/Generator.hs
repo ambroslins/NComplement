@@ -30,7 +30,7 @@ defineArgs = mapM_ def
           i <- nextIndex
           let var = Variable {typeof = argType arg, index = i}
           modifySymbols $ Map.insert name (Var var)
-          emit $ NC.Definiton i (Left 0) name
+          emit $ NC.Definiton i (argDefault arg) name
 
 defineVars :: Gen ()
 defineVars = do
@@ -43,7 +43,7 @@ defineVars = do
       )
       (Map.toList (Map.difference (symbols env) prev))
   where
-    def name var = NC.Definiton (index var) (Left 0) name
+    def name var = NC.Definiton (index var) Nothing name
 
 expr :: Expr -> Gen (Type, NC.Expr)
 expr = \case

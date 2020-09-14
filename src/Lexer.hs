@@ -80,7 +80,7 @@ integer :: (Integral a, Num a) => Parser a
 integer = lexeme $ Lex.signed sc natural
 
 real :: Parser Double
-real = lexeme $ Lex.signed sc Lex.float
+real = lexeme $ Lex.float
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")

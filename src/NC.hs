@@ -9,14 +9,18 @@ import Syntax
     Index (..),
     Location (..),
     Name (..),
+    Sign (..),
   )
+
+digit :: Int
+digit = 1
 
 data Statement
   = Codes [Code]
   | Assign Index Expr
   | IF (Expr, Ordering, Expr) (Maybe Location, Maybe Location)
   | CRT Text
-  | Definiton Index (Either Int Double) Name
+  | Definiton Index (Maybe (Sign, Literal)) Name
   | Escape Text
   deriving (Eq, Show)
 
@@ -91,7 +95,25 @@ instance ToText Statement where
           GT -> ">"
         f = maybe "" toText
     CRT t -> "CRT" <> parens t
-    Definiton i _ desc -> "H" <> (toText i) <> "   =  " <> "+000000.0000" <> "  ( " <> Text.justifyLeft 43 ' ' (unName desc) <> ")"
+    Definiton i def desc ->
+      "H" <> (toText i) <> "   =  " <> val def
+        <> "   ( "
+        <> Text.justifyLeft 43 ' ' (unName desc)
+        <> ")"
+      where
+        val = \case
+          Just (s, Lit.Real x) ->
+            let (int, frac) = Text.breakOn "." (Text.pack $ show $ abs x)
+             in sign s <> Text.justifyRight (6 - digit) '0' int
+                  <> Text.justifyLeft (4 + digit) '0' frac
+          Just (s, Lit.Int x) ->
+            sign s <> Text.replicate (6 - digit) "0" <> "."
+              <> pad0 (3 + digit) (abs x)
+          Just (_, Lit.Bool x) ->
+            val $ Just (Plus, Lit.Int $ if x then 1 else 0)
+          _ -> val $ Just (Plus, Lit.Int 0)
+        sign Minus = "-"
+        sign Plus = "+"
     Escape x -> x
 
 instance ToText Code where

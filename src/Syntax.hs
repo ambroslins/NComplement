@@ -7,7 +7,7 @@ import Literal (Literal)
 import Type (Type)
 
 data Argument = Argument
-  { argDefault :: Maybe Literal,
+  { argDefault :: Maybe (Sign, Literal),
     argType :: Type,
     description :: Maybe Text
   }
@@ -28,6 +28,11 @@ data Expr
   | Mul Expr Expr
   | Div Expr Expr
   | Pow Int Expr
+  deriving (Eq, Show)
+
+data Sign
+  = Plus
+  | Minus
   deriving (Eq, Show)
 
 data Statement

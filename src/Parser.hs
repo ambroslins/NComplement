@@ -51,13 +51,13 @@ term :: Parser Expr
 term =
   choice
     [ parens expr,
-      application,
+      apply,
       reference,
       symbol,
       Lit <$> literal
     ]
   where
-    application = try $ App <$> name <*> parens (sepBy expr comma)
+    apply = try $ App <$> name <*> parens (sepBy expr comma)
 
 literal :: Parser Literal
 literal =
@@ -102,9 +102,13 @@ arg :: Parser (Name, Argument)
 arg = do
   n <- name
   mtype <- optional $ colon >> parseType
-  def <- optional $ equal >> literal
+  def <- optional $ do
+        equal
+        sign <- option Plus (Minus <$ minus <|> Plus <$ plus)
+        lit <- literal
+        pure (sign, lit)
   desc <- optional (Text.pack <$> (char '(' >> manyTill charLiteral (char ')')))
-  let t = fromMaybe Type.Real $ mtype <|> Lit.type' <$> def
+  let t = fromMaybe Type.Real $ mtype <|> Lit.type' . snd <$> def
   pure $ (n, Argument {argType = t, argDefault = def, description = desc})
 
 parseType :: Parser Type
