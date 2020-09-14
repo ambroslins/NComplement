@@ -1,6 +1,7 @@
 module NComplement where
 
 import Control.Exception (throwIO)
+import Data.Text (Text, pack)
 import qualified Data.Text.IO as Text
 import Error
 import Gen
@@ -10,11 +11,20 @@ import qualified Parser
 import System.FilePath
 import Text.Megaparsec (parse)
 
-compile :: FilePath -> FilePath -> IO ()
-compile inFilePath outFilePath = do
+runCompiler :: FilePath -> FilePath -> IO ()
+runCompiler inFilePath outFilePath = do
   input <- Text.readFile inFilePath
+  case compile inFilePath input of
+    Left e -> throwIO e
+    Right output -> Text.writeFile outFilePath output
+
+repl :: IO ()
+repl = Text.interact $ either (pack . show) id . compile "NComplement"
+
+compile :: FilePath -> Text -> Either Error Text
+compile inFilePath input =
   case parse Parser.program (takeFileName inFilePath) input of
-    Left e -> throwIO $ ParseError e
-    Right ast -> case runGenerator emptyEnv (Generator.program ast) of
-      Left e -> throwIO $ e
-      Right output -> Text.writeFile outFilePath (NC.printStmts output)
+    Left e -> Left $ ParseError e
+    Right ast ->
+      NC.printStmts
+        <$> runGenerator emptyEnv (Generator.program ast)

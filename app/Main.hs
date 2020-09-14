@@ -11,9 +11,10 @@ main :: IO ()
 main =
   handle handler $
     getArgs >>= \case
+      [] -> repl
       [inFilePath] ->
         if ext == ".nco"
-          then compile inFilePath outFilePath
+          then runCompiler inFilePath outFilePath
           else throwIO Error
         where
           (file, ext) = splitExtension inFilePath
