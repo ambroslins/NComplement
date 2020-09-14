@@ -1,6 +1,6 @@
-name:                NCompiler
+name:                NComplement
 version:             0.1.0.0
-github:              "ambroslins/NCompiler"
+github:              "ambroslins/NComplement"
 license:             BSD3
 author:              "Ambros Lins"
 maintainer:          "ambros.lins@gmail.com"
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/NCompiler#readme>
+description:         Please see the README on GitHub at <https://github.com/githubuser/NComplement#readme>
 
 dependencies:
 - base >= 4.7 && < 5
@@ -39,7 +39,7 @@ library:
     - -Wall
 
 executables:
-  NCompiler-exe:
+  NComplement:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -48,10 +48,10 @@ executables:
     - -with-rtsopts=-N
     - -Wall
     dependencies:
-    - NCompiler
+    - NComplement
 
 tests:
-  NCompiler-test:
+  NComplement-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -61,7 +61,7 @@ tests:
     - -Wall
     - -fno-warn-orphans
     dependencies:
-    - NCompiler
+    - NComplement
     - hspec
     - hspec-megaparsec
     - QuickCheck
