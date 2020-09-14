@@ -28,6 +28,7 @@ dependencies:
 - tardis
 - containers
 - text
+- filepath
 
 default-extensions:
   - LambdaCase
