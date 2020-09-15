@@ -1,6 +1,5 @@
 module Parser where
 
-import Control.Monad (liftM2)
 import Control.Monad.Combinators
   ( choice,
     many,
@@ -15,7 +14,6 @@ import Control.Monad.Combinators.NonEmpty
     some,
   )
 import Data.Char (isUpper)
-import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer

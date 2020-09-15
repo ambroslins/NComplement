@@ -117,7 +117,11 @@ instance ToText Statement where
 
 instance ToText Code where
   toText = \case
-    (Code adr x) -> toText adr <> toText x
+    Code "G" (Int x) -> "G" <> pad0 2 x
+    Code "M" (Int x) -> "M" <> pad0 2 x
+    Code "T" (Int x) -> "T" <> pad0 3 x
+    Code "C" (Int x) -> "C" <> pad0 3 x
+    Code adr x -> toText adr <> toText x
     Comment x -> parens (Text.toUpper x)
 
 instance ToText Expr where
