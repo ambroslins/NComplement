@@ -44,6 +44,7 @@ data Statement'
   | Set (NonEmpty Address) (NonEmpty Expr)
   | Scope [Statement]
   | Unsafe [Either Text Expr]
+  | Call Address [Expr]
   | Codes (NonEmpty Code)
   | If (Expr, Ordering, Expr) Statement (Maybe Statement)
   | Label Name

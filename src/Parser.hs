@@ -1,5 +1,6 @@
 module Parser where
 
+import Control.Monad (liftM2)
 import Control.Monad.Combinators
   ( choice,
     many,
@@ -14,6 +15,7 @@ import Control.Monad.Combinators.NonEmpty
     some,
   )
 import Data.Char (isUpper)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer
@@ -138,42 +140,30 @@ statement =
   lexeme' $
     At <$> getSourceLine
       <*> choice
-        [ ifStatement,
-          try label,
-          get,
-          set,
-          assignment,
-          scope,
-          unsafe,
-          Codes <$> some code
+        [ parseIf,
+          Get <$> try (name `sepBy1` comma <* leftArrow)
+            <*> address `sepBy1` comma,
+          Set <$> try (address `sepBy1` comma <* leftArrow)
+            <*> expr `sepBy1` comma,
+          Label <$> try (name <* colon),
+          Assign <$> name <* equal <*> expr,
+          Scope <$> braces statements,
+          try $ Call <$> address <*> parens (expr `sepBy` comma),
+          Codes <$> some (Code <$> address <*> expr),
+          unsafe
         ]
   where
-    ifStatement = do
+    parseIf = do
       reserved "If"
       lhs <- expr
-      ord <-
-        choice
-          [ EQ <$ equal,
-            LT <$ lessThan,
-            GT <$ greaterThan
-          ]
+      ord <- EQ <$ equal <|> LT <$ lessThan <|> GT <$ greaterThan
       rhs <- expr
       sThen <- statement
       sElse <- optional $ reserved "Else" *> statement
       pure $ If (lhs, ord, rhs) sThen sElse
-    label = Label <$> name <* colon
-    get = Get <$> try (sepBy1 name comma <* leftArrow) <*> sepBy1 address comma
-    set = Set <$> try (sepBy1 address comma <* leftArrow) <*> sepBy1 expr comma
-    assignment = do
-      var <- name
-      equal
-      e <- expr
-      pure $ Assign var e
-    scope = Scope <$> braces statements
     unsafe =
       Unsafe . splitCap (reference <|> symbol)
         <$> (exclamation *> takeWhileP Nothing (not . (`elem` [';', '\n'])))
-    code = Code <$> address <*> expr
 
 address :: Parser Address
 address = lexeme $ Address <$> takeWhile1P (Just "address") isUpper

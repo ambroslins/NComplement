@@ -18,7 +18,7 @@ data Statement
   = Codes [Code]
   | Assign Index Expr
   | IF (Expr, Ordering, Expr) (Maybe Location, Maybe Location)
-  | CRT Text
+  | Call Address [Expr]
   | Definiton Index (Maybe (Sign, Literal)) Text
   | Escape Text
   deriving (Eq, Show)
@@ -93,7 +93,7 @@ instance ToText Statement where
           LT -> "<"
           GT -> ">"
         f = maybe "" toText
-    CRT t -> "CRT" <> parens t
+    Call adr xs -> toText adr <> parens (Text.intercalate "," (map toText xs))
     Definiton i def desc ->
       "H" <> (toText i) <> "   =  " <> val def
         <> "   ( "

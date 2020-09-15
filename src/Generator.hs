@@ -179,6 +179,7 @@ statement (At pos stmt) = do
           modifySymbols $ Map.insert name (Loc loc)
           emit $ NC.Codes [NC.n loc, NC.Comment $ unName name]
     Codes cs -> emit =<< NC.Codes <$> instr (toList cs)
+    Call adr xs -> emit =<< (NC.Call adr . fmap snd <$> mapM expr xs)
     Get names address -> do
       xs <- f (toList names) (toList address)
       emit $ NC.Codes (NC.g 83 : xs)
