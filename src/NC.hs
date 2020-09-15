@@ -8,7 +8,6 @@ import Syntax
   ( Address (..),
     Index (..),
     Location (..),
-    Name (..),
     Sign (..),
   )
 
@@ -20,7 +19,7 @@ data Statement
   | Assign Index Expr
   | IF (Expr, Ordering, Expr) (Maybe Location, Maybe Location)
   | CRT Text
-  | Definiton Index (Maybe (Sign, Literal)) Name
+  | Definiton Index (Maybe (Sign, Literal)) Text
   | Escape Text
   deriving (Eq, Show)
 
@@ -98,14 +97,14 @@ instance ToText Statement where
     Definiton i def desc ->
       "H" <> (toText i) <> "   =  " <> val def
         <> "   ( "
-        <> Text.justifyLeft 43 ' ' (unName desc)
+        <> Text.justifyLeft 44 ' ' desc
         <> ")"
       where
         val = \case
           Just (s, Lit.Real x) ->
             let (int, frac) = Text.breakOn "." (Text.pack $ show $ abs x)
              in sign s <> Text.justifyRight (6 - digit) '0' int
-                  <> Text.justifyLeft (4 + digit) '0' frac
+                  <> Text.take (4 + digit) (Text.justifyLeft (4 + digit) '0' frac)
           Just (s, Lit.Int x) ->
             sign s <> Text.replicate (6 - digit) "0" <> "."
               <> pad0 (3 + digit) (abs x)

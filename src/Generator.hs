@@ -3,7 +3,7 @@ module Generator where
 import Control.Monad (when)
 import Data.Foldable (toList)
 import qualified Data.Map as Map
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Text as Text
 import Error
 import Gen
@@ -31,7 +31,11 @@ defineArgs = mapM_ def
           i <- nextIndex
           let var = Variable {typeof = argType arg, index = i}
           modifySymbols $ Map.insert name (Var var)
-          emit $ NC.Definiton i (argDefault arg) name
+          emit $
+            NC.Definiton
+              i
+              (argDefault arg)
+              (fromMaybe (unName name) (description arg))
 
 defineVars :: Gen ()
 defineVars = do
@@ -44,7 +48,7 @@ defineVars = do
       )
       (Map.toList (Map.difference (symbols env) prev))
   where
-    def name var = NC.Definiton (index var) Nothing name
+    def name var = NC.Definiton (index var) Nothing (unName name)
 
 expr :: Expr -> Gen (Type, NC.Expr)
 expr = \case
