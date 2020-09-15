@@ -15,12 +15,12 @@ main =
       [inFilePath] ->
         if ext == ".nco"
           then runCompiler inFilePath outFilePath
-          else throwIO Error
+          else throwIO $ InvalidExtension ext
         where
           (file, ext) = splitExtension inFilePath
           (path, name) = splitFileName file
           outFilePath = path </> map toUpper name <.> ".NC"
-      _ -> throwIO Error
+      _ -> throwIO InvalidArguments
   where
     handler :: SomeException -> IO ()
     handler e = print e

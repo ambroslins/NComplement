@@ -99,7 +99,7 @@ nextIndex :: Gen Index
 nextIndex = do
   is <- gets indices
   case is of
-    [] -> throwE Error
+    [] -> throwE OutOfIndices
     i : is' -> do
       modify $ \env -> env {indices = is'}
       pure i
@@ -108,7 +108,7 @@ nextLocation :: Gen Location
 nextLocation = do
   ls <- gets locations
   case ls of
-    [] -> throwE Error
+    [] -> throwE OutOfLocations
     l : ls' -> do
       modify $ \env -> env {locations = ls'}
       pure l
