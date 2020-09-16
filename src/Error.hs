@@ -1,6 +1,6 @@
 module Error
   ( Error (..),
-    Error' (..),
+    CompileError (..),
   )
 where
 
@@ -16,7 +16,7 @@ data Error
   = ParseError (ParseErrorBundle Text Void)
   | InvalidExtension String
   | InvalidArguments
-  | CompileError Pos Text Error'
+  | CompileError Pos Text CompileError
 
 instance Exception Error
 
@@ -37,7 +37,7 @@ instance Show Error where
         p = show (unPos pos)
         blank = (' ' <$ p) ++ " |"
 
-data Error'
+data CompileError
   = OutOfIndices
   | OutOfLocations
   | UndefinedSymbol Name
@@ -58,7 +58,7 @@ data Error'
   | GetSetNotMatching
   deriving (Eq)
 
-instance Show Error' where
+instance Show CompileError where
   show =
     (++ ".") . \case
       OutOfIndices -> "I am out of Indicies"

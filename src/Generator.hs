@@ -1,6 +1,6 @@
 module Generator where
 
-import Control.Monad (when)
+import Control.Monad (forM, when)
 import Data.Foldable (toList)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, mapMaybe)
@@ -178,7 +178,21 @@ statement (At pos stmt) = do
           loc <- nextLocation
           modifySymbols $ Map.insert name (Loc loc)
           emit $ NC.Codes [NC.n loc, NC.Comment $ unName name]
-    Codes cs -> emit =<< NC.Codes <$> instr (toList cs)
+    Codes cs -> do
+      syms <- gets symbols
+      xs <- forM (toList cs) $ \(Code adr x) -> case x of
+        Sym name | not (name `Map.member` syms) -> pure $ Left (adr, name)
+        x' -> Right . NC.Code adr . snd <$> expr x'
+      emitWithFuture $ \env ->
+        NC.Codes
+          <$> forM
+            xs
+            ( \case
+                Right x -> Right x
+                Left (adr, name) -> case Map.lookup name (symbols env) of
+                  Just (Loc loc) -> pure $ NC.Code adr (NC.Loc loc)
+                  _ -> Left $ UndefinedSymbol name
+            )
     Call adr xs -> emit =<< (NC.Call adr . fmap snd <$> mapM expr xs)
     Get names address -> do
       xs <- f (toList names) (toList address)
@@ -237,6 +251,3 @@ statement (At pos stmt) = do
             then pure var
             else throwE $ TypeMismatchDef name t' t
         Just _ -> throwE $ NotAVariable name
-
-instr :: [Code] -> Gen [NC.Code]
-instr = mapM $ \(Code adr x) -> NC.Code adr . snd <$> expr x

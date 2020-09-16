@@ -64,7 +64,7 @@ runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . r
 setSourceLine :: Pos -> Gen ()
 setSourceLine p = modify $ \env -> env {currentLine = p}
 
-throwE :: Error' -> Gen a
+throwE :: CompileError -> Gen a
 throwE err = do
   pos <- gets currentLine
   src <- gets source
@@ -89,11 +89,16 @@ emit = tell . pure . pure
 emits :: [NC.Statement] -> Gen ()
 emits = mapM_ emit
 
-emitWithFuture :: (Env -> Either Error NC.Statement) -> Gen ()
+emitWithFuture :: (Env -> Either CompileError NC.Statement) -> Gen ()
 emitWithFuture = emitsWithFuture . fmap pure
 
-emitsWithFuture :: (Env -> [Either Error NC.Statement]) -> Gen ()
-emitsWithFuture f = (lift $ lift $ getFuture) >>= tell . f
+emitsWithFuture :: (Env -> [Either CompileError NC.Statement]) -> Gen ()
+emitsWithFuture f = do
+  pos <- gets currentLine
+  src <- gets source
+  env <- lift $ lift $ getFuture
+  let line = Text.lines src !! (unPos pos -1)
+  tell $ map (either (Left . CompileError pos line) pure) $ f env
 
 nextIndex :: Gen Index
 nextIndex = do
