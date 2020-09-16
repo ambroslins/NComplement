@@ -4,7 +4,6 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Literal (Literal)
 import qualified Literal as Lit
-import Numeric
 import Syntax
   ( Address (..),
     Index (..),
@@ -99,17 +98,16 @@ instance ToText Statement where
     Definiton i def desc ->
       "H" <> (toText i) <> "   =  " <> val def
         <> "   ( "
-        <> Text.justifyLeft 44 ' ' desc
+        <> Text.justifyLeft 44 ' ' (Text.toUpper desc)
         <> ")"
       where
         val = \case
           Just (s, Lit.Real x) ->
-            let (int, frac) =
-                  Text.breakOn
-                    "."
-                    (Text.pack $ showFFloatAlt (Just (3 + digit)) (abs x) "")
+            let (int, frac) = Text.breakOn "." (Text.pack $ show (abs x))
              in sign s <> Text.justifyRight (6 - digit) '0' int
-                  <> Text.justifyLeft (4 + digit) '0' frac
+                  <> Text.take
+                    (4 + digit)
+                    (Text.justifyLeft (4 + digit) '0' frac)
           Just (s, Lit.Int x) ->
             sign s <> Text.replicate (6 - digit) "0" <> "."
               <> pad0 (3 + digit) (abs x)
@@ -132,7 +130,9 @@ instance ToText Code where
 instance ToText Expr where
   toText = \case
     Int x -> Text.pack $ show x
-    Real x -> Text.pack $ showFFloatAlt (Just 3) x ""
+    Real x ->
+      let (int, frac) = Text.breakOn ". " $ Text.pack $ show x
+       in int <> Text.take 4 frac
     Var i -> "H" <> toText i
     Ref i -> toText i
     Loc l -> toText l
