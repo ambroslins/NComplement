@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: db5c742ef58173248c8ad7dbc8f0922ad3a8fea43f845986fc2d44fd4868ea11
+-- hash: 19c1d59e7e14d6758e288fb0a025917a8fcb8704b64582cd8a4eff850e9a6d1e
 
 name:           NComplement
 version:        0.1.0.0
@@ -48,7 +48,7 @@ library
       base >=4.7 && <5
     , containers
     , filepath
-    , megaparsec
+    , megaparsec >=9.0.0
     , mtl
     , parser-combinators
     , replace-megaparsec
@@ -69,7 +69,7 @@ executable NComplement
     , base >=4.7 && <5
     , containers
     , filepath
-    , megaparsec
+    , megaparsec >=9.0.0
     , mtl
     , parser-combinators
     , replace-megaparsec
@@ -95,8 +95,8 @@ test-suite NComplement-test
     , containers
     , filepath
     , hspec
-    , hspec-megaparsec
-    , megaparsec
+    , hspec-megaparsec >=2.2.0
+    , megaparsec >=9.0.0
     , mtl
     , parser-combinators
     , replace-megaparsec
