@@ -45,7 +45,7 @@ getSourceLine = sourceLine <$> getSourcePos
 sc :: Parser ()
 sc =
   Lex.space
-    (void $ some (oneOf [' ', '\t']))
+    hspace1
     (Lex.skipLineComment "#")
     empty
 
