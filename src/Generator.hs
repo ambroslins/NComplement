@@ -4,12 +4,16 @@ import Control.Monad (forM, when)
 import Data.Foldable (toList)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
 import Gen
+import Literal (Literal)
 import qualified Literal as Lit
 import Located
 import qualified NC
+import Prettyprinter
+import Result
 import Syntax
 import Type (Type)
 import qualified Type
@@ -19,6 +23,37 @@ program p = do
   defineArgs (arguments p)
   defineVars
   mapM_ statement (body p)
+
+digit :: Int
+digit = 1
+
+eol :: Doc'
+eol = semi <> hardline
+
+definition :: Index -> Maybe (Sign, Literal) -> Text -> Doc'
+definition i def desc =
+  "H" <> pretty i <> "   =  " <> pretty (value def) <> "   "
+    <> parens
+      ( column $
+          \c -> pretty $ Text.justifyLeft (71 - c) ' ' (Text.toUpper desc)
+      )
+    <> eol
+  where
+    showAbs :: (Show a, Integral a) => a -> Text
+    showAbs = Text.pack . show . abs
+    sign Plus = "+"
+    sign Minus = "+"
+    value = \case
+      Just (s, Lit.Real x) ->
+        let (int, frac) = Text.breakOn "." (showAbs x)
+         in sign s <> Text.justifyRight (6 - digit) '0' int
+              <> Text.take (4 + digit) (Text.justifyLeft (4 + digit) '0' frac)
+      Just (s, Lit.Int x) ->
+        sign s <> Text.replicate (6 - digit) "0" <> "."
+          <> Text.justifyRight (3 + digit) '0' (showAbs x)
+      Just (_, Lit.Bool x) ->
+        value $ Just (Plus, Lit.Int $ if x then 1 else 0)
+      _ -> value $ Just (Plus, Lit.Int 0)
 
 defineArgs :: [(Name, Argument)] -> Gen ()
 defineArgs = mapM_ def
@@ -33,7 +68,7 @@ defineArgs = mapM_ def
           let var = Variable {typeof = t, index = i}
           modifySymbols $ Map.insert name (Var var)
           emit $
-            NC.Definiton
+            definition
               i
               (either (const Nothing) (Just) $ typeOrDefault arg)
               (fromMaybe (unName name) (description arg))
@@ -41,30 +76,29 @@ defineArgs = mapM_ def
 defineVars :: Gen ()
 defineVars = do
   prev <- gets symbols
-  emitsWithFuture $ \env ->
-    mapMaybe
-      ( \case
-          (n, Var var) -> Just $ pure $ def n var
-          _ -> Nothing
-      )
-      (Map.toList (Map.difference (symbols env) prev))
-  where
-    def name var = NC.Definiton (index var) Nothing (unName name)
+  emitWithFuture $ \env ->
+    pure $
+      vsep $
+        mapMaybe
+          ( \case
+              (name, Var var) -> Just $ definition (index var) Nothing (unName name)
+              _ -> Nothing
+          )
+          (Map.toList (Map.difference (symbols env) prev))
 
-expr :: Expr -> Gen (Type, NC.Expr)
+expr :: Expr -> Gen (Type, Doc')
 expr = \case
-  Lit x -> pure (Lit.type' x, NC.fromLit x)
+  Lit x -> pure (Lit.type' x, pretty x)
   Sym name -> do
     syms <- gets symbols
     case Map.lookup name syms of
-      Just (Var var) -> pure (typeof var, NC.Var (index var))
-      Just (Loc loc) -> pure (Type.Location, NC.Loc loc)
+      Just (Var var) -> pure (typeof var, "H" <> pretty (index var))
       Just _ -> throwE $ NotAVariable name
       Nothing -> throwE $ UndefinedSymbol name
   Ref name -> do
     syms <- gets symbols
     case Map.lookup name syms of
-      Just (Var var) -> pure (Type.Index, NC.Ref (index var))
+      Just (Var var) -> pure (Type.Index, pretty (index var))
       Just _ -> throwE $ NotAVariable name
       Nothing -> throwE $ UndefinedSymbol name
   App name args -> do
@@ -73,31 +107,48 @@ expr = \case
       Just (Fun f) -> f args
       Just _ -> throwE $ NotAFunction name
       Nothing -> throwE $ UndefinedSymbol name
-  Ret i -> pure (Type.Real, NC.Ret i)
+  Ret _ -> pure (Type.Real, "HRET")
   Neg x -> do
-    (t, e) <- expr x
+    (t, x') <- expr x
+    let x'' = "-" <> brackets x'
     case t of
-      Type.Int -> pure (Type.Int, NC.Neg e)
-      Type.Real -> pure (Type.Real, NC.Neg e)
+      Type.Int -> pure (Type.Int, x'')
+      Type.Real -> pure (Type.Real, x'')
       _ -> throwE $ TypeMismatchNeg t
-  Add x y -> additive NC.Add x y TypeMismatchAdd
-  Sub x y -> additive NC.Sub x y TypeMismatchSub
+  Add x y -> do
+    (tx, x') <- expr x
+    (ty, y') <- expr y
+    let z = brackets (x' <> "+" <> y')
+    case (tx, ty) of
+      (Type.Real, Type.Real) -> pure (Type.Real, z)
+      (Type.Int, Type.Int) -> pure (Type.Int, z)
+      _ -> throwE $ TypeMismatchAdd tx ty
+  Sub x y -> do
+    (tx, x') <- expr x
+    (ty, y') <- expr y
+    let z = brackets (x' <> "-" <> y')
+    case (tx, ty) of
+      (Type.Real, Type.Real) -> pure (Type.Real, z)
+      (Type.Int, Type.Int) -> pure (Type.Int, z)
+      _ -> throwE $ TypeMismatchAdd tx ty
   Mul x y -> do
-    (tx, ex) <- expr x
-    (ty, ey) <- expr y
+    (tx, x') <- expr x
+    (ty, y') <- expr y
+    let z = brackets (x' <> "*" <> y')
     case (tx, ty) of
-      (Type.Int, Type.Int) -> pure (Type.Int, NC.Mul ex ey)
-      (Type.Int, Type.Real) -> pure (Type.Real, NC.Mul ex ey)
-      (Type.Real, Type.Int) -> pure (Type.Real, NC.Mul ex ey)
-      (Type.Real, Type.Real) -> pure (Type.Real, NC.Div (NC.Mul ex ey) (NC.Real 1.0))
-      _ -> throwE $ TypeMismatchMul tx ty
+      (Type.Int, Type.Int) -> pure (Type.Int, z)
+      (Type.Int, Type.Real) -> pure (Type.Real, z)
+      (Type.Real, Type.Int) -> pure (Type.Real, z)
+      (Type.Real, Type.Real) -> pure (Type.Real, brackets (x' <> "*" <> y' <> "/1."))
+      _ -> throwE $ TypeMismatchAdd tx ty
   Div x y -> do
-    (tx, ex) <- expr x
-    (ty, ey) <- expr y
+    (tx, x') <- expr x
+    (ty, y') <- expr y
+    let z = brackets (x' <> "/" <> y')
     case (tx, ty) of
-      (Type.Int, Type.Int) -> pure (Type.Int, NC.Div ex ey)
-      (Type.Real, Type.Int) -> pure (Type.Real, NC.Div ex ey)
-      (Type.Real, Type.Real) -> pure (Type.Real, NC.Mul (NC.Div ex ey) (NC.Real 1.0))
+      (Type.Int, Type.Int) -> pure (Type.Int, z)
+      (Type.Real, Type.Int) -> pure (Type.Real, z)
+      (Type.Real, Type.Real) -> pure (Type.Real, brackets (x' <> "/" <> y' <> "*1."))
       _ -> throwE $ TypeMismatchDiv tx ty
   Pow n x ->
     expr $
@@ -108,26 +159,17 @@ expr = \case
         $ case replicate (abs n) x of
           [] -> Lit $ Lit.Int 1
           x' : xs -> foldr Mul x' xs
-  where
-    additive f x y e = do
-      (tx, ex) <- expr x
-      (ty, ey) <- expr y
-      t <- case (tx, ty) of
-        (Type.Int, Type.Int) -> pure Type.Int
-        (Type.Real, Type.Real) -> pure Type.Real
-        _ -> throwE $ e tx ty
-      pure (t, f ex ey)
 
-functions :: [(Name, [Expr] -> Gen (Type, NC.Expr))]
+functions :: [(Name, [Expr] -> Gen (Type, Doc'))]
 functions =
-  [ included "sin" NC.SIN,
-    included "cos" NC.COS,
-    included "tan" NC.TAN,
-    included "asin" NC.ASIN,
-    included "acos" NC.ACOS,
-    included "atan" NC.ATAN,
-    included "sqrt" NC.SQRT,
-    included "round" NC.ROUND,
+  [ included "sin",
+    included "cos",
+    included "tan",
+    included "asin",
+    included "acos",
+    included "atan",
+    included "sqrt",
+    included "round",
     ( "norm",
       \args -> case map (Pow 2) args of
         [] -> throwE $ TypeMismatchApp "norm" [Type.Real, Type.Real] []
@@ -135,15 +177,15 @@ functions =
     )
   ]
   where
-    included name f =
+    included name =
       ( name,
-        \args -> do
-          xs <- mapM expr args
-          case xs of
-            [(t, x)] -> case t of
-              Type.Real -> pure $ (Type.Real, NC.App f x)
-              _ -> throwE $ TypeMismatchApp name [Type.Real] [t]
-            xs' -> throwE $ TypeMismatchApp name [Type.Real] (map fst xs')
+        \case
+          [x] -> do
+            (t, x') <- mapDoc brackets $ expr x
+            if t == Type.Real
+              then pure (Type.Real, pretty name <> parens x')
+              else throwE $ TypeMismatchApp name [Type.Real] [t]
+          _ -> throwE $ TypeMismatchApp name [Type.Real] []
       )
 
 statement :: Statement -> Gen ()
@@ -151,27 +193,32 @@ statement (At pos stmt) = do
   setSourceLine pos
   case stmt of
     Assign name x -> do
-      (t, e) <- expr x
+      (t, x') <- expr x
       var <- defineVar name t
-      emit $ NC.Assign (index var) e
-    If (lhs, ord, rhs) thens melses -> do
-      (tl, el) <- expr lhs
-      (tr, er) <- expr rhs
+      emit $ "H" <> pretty (index var) <+> "=" <+> x' <> eol
+    If (l, ord, r) thens melses -> do
+      (tl, xl) <- expr l
+      (tr, xr) <- expr r
       when (tl /= tr) $ throwE $ TypeMismatchIf tl tr
       l1 <- nextLocation
-      emit $ NC.IF (el, ord, er) (Nothing, Just l1)
+      let s = case ord of
+            EQ -> "="
+            LT -> "<"
+            GT -> ">"
+      emit $ "IF" <+> xl <> s <> xr <+> tupled ["", pretty l1] <> eol
       statement thens
       case melses of
-        Nothing -> emit $ NC.Codes [NC.n l1]
+        Nothing -> emit $ "N" <> pretty l1
         Just elses -> do
           l2 <- nextLocation
-          emits $ NC.Codes . pure <$> [NC.jump l2, NC.n l1]
+          emit $ "JUMP" <> pretty l2 <> eol
+          emit $ "N" <> pretty l1 <> eol
           statement elses
-          emit $ NC.Codes [NC.n l2]
+          emit $ "N" <> pretty l2 <> eol
     Scope stmts -> mapM_ statement stmts
     Unsafe x -> do
       xs <- mapM (either pure (fmap (NC.toText . snd) . expr)) x
-      emit $ NC.Escape $ Text.concat xs
+      emit $ pretty $ Text.concat xs
     Label name -> do
       syms <- gets symbols
       if name `Map.member` syms
@@ -179,33 +226,35 @@ statement (At pos stmt) = do
         else do
           loc <- nextLocation
           modifySymbols $ Map.insert name (Loc loc)
-          emit $ NC.Codes [NC.n loc, NC.Comment $ unName name]
+          emit $ "N" <> pretty loc <+> parens (pretty name)
     Codes cs -> do
       syms <- gets symbols
       xs <- forM (toList cs) $ \(Code adr x) -> case x of
         Sym name | not (name `Map.member` syms) -> pure $ Left (adr, name)
-        x' -> Right . NC.Code adr . snd <$> expr x'
+        x' -> (Right . (pretty adr <>) . snd <$> expr x')
       emitWithFuture $ \env ->
-        NC.Codes
-          <$> forM
-            xs
-            ( \case
-                Right x -> Right x
-                Left (adr, name) -> case Map.lookup name (symbols env) of
-                  Just (Loc loc) -> pure $ NC.Code adr (NC.Loc loc)
-                  _ -> Left $ UndefinedSymbol name
+        hsep
+          <$> fromEither
+            ( forM
+                xs
+                ( \case
+                    Right x -> Right x
+                    Left (adr, name) -> case Map.lookup name (symbols env) of
+                      Just (Loc loc) -> pure $ pretty adr <> pretty loc
+                      _ -> Left $ UndefinedSymbol name
+                )
             )
-    Call adr xs -> emit =<< (NC.Call adr . fmap snd <$> mapM expr xs)
+    Call adr xs -> emit =<< ((pretty adr <>) . tupled . fmap snd <$> mapM expr xs)
     Get names address -> do
       xs <- f (toList names) (toList address)
-      emit $ NC.Codes (NC.g 83 : xs)
+      emit $ hsep ("G83" : xs)
       where
         f [] [] = pure []
         f (n : ns) (a : as) = case Map.lookup a getters of
           Nothing -> throwE $ NotAGetter a
           Just t -> do
             var <- defineVar n t
-            (NC.Code a (NC.Ref (index var)) :) <$> f ns as
+            (pretty a <> pretty (index var) :) <$> f ns as
         f _ _ = throwE GetSetNotMatching
         getters =
           Map.fromList $
@@ -219,7 +268,7 @@ statement (At pos stmt) = do
             ]
     Set address exprs -> do
       xs <- f (toList address) (toList exprs)
-      emit $ NC.Codes (NC.g 92 : xs)
+      emit $ hsep ("G92" : xs)
       where
         f [] [] = pure []
         f (a : as) (e : es) = case Map.lookup a setters of
@@ -227,7 +276,7 @@ statement (At pos stmt) = do
           Just t -> do
             (t', e') <- expr e
             if t == t'
-              then (NC.Code a e' :) <$> f as es
+              then (pretty a <> e' :) <$> f as es
               else throwE $ TypeMismatchSet a t t'
         f _ _ = throwE GetSetNotMatching
         setters =

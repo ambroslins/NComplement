@@ -5,6 +5,7 @@ module Literal
 where
 
 import Data.Text (Text)
+import Prettyprinter
 import Type (Type)
 import qualified Type
 
@@ -21,3 +22,10 @@ type' = \case
   Int _ -> Type.Int
   Bool _ -> Type.Bool
   String _ -> Type.String
+
+instance Pretty Literal where
+  pretty = \case
+    Real x -> pretty x
+    Int x -> pretty x
+    Bool x -> pretty $ if x then 1 else (0 :: Int)
+    String x -> pretty x

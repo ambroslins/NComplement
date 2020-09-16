@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 19c1d59e7e14d6758e288fb0a025917a8fcb8704b64582cd8a4eff850e9a6d1e
+-- hash: 0adec3b0ac91589a0cdc43e2c216e323c05a00620cff242acc8635c75c85c946
 
 name:           NComplement
 version:        0.1.0.0
@@ -36,6 +36,7 @@ library
       NC
       NComplement
       Parser
+      Result
       Syntax
       Type
   other-modules:
@@ -51,6 +52,7 @@ library
     , megaparsec >=9.0.0
     , mtl
     , parser-combinators
+    , prettyprinter >=1.7.0
     , replace-megaparsec
     , tardis
     , text
@@ -72,6 +74,7 @@ executable NComplement
     , megaparsec >=9.0.0
     , mtl
     , parser-combinators
+    , prettyprinter >=1.7.0
     , replace-megaparsec
     , tardis
     , text
@@ -99,6 +102,7 @@ test-suite NComplement-test
     , megaparsec >=9.0.0
     , mtl
     , parser-combinators
+    , prettyprinter >=1.7.0
     , replace-megaparsec
     , tardis
     , text

@@ -3,8 +3,10 @@ module Syntax where
 import Data.List.NonEmpty (NonEmpty)
 import Data.String (IsString (..))
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Literal (Literal)
 import Located
+import Prettyprinter
 import Type (Type)
 
 data Argument = Argument
@@ -56,11 +58,17 @@ data Code = Code Address Expr
 newtype Name = Name {unName :: Text}
   deriving (Eq, Ord, Show)
 
+instance Pretty Name where
+  pretty = pretty . unName
+
 instance IsString Name where
   fromString s = Name $ fromString s
 
 newtype Address = Address Text
   deriving (Eq, Ord, Show)
+
+instance Pretty Address where
+  pretty (Address x) = pretty x
 
 instance IsString Address where
   fromString s = Address $ fromString s
@@ -68,5 +76,11 @@ instance IsString Address where
 newtype Index = Index Int
   deriving (Eq, Ord, Show)
 
+instance Pretty Index where
+  pretty (Index x) = pretty $ Text.justifyRight 3 '0' $ Text.pack $ show x
+
 newtype Location = Location Int
   deriving (Eq, Ord, Show)
+
+instance Pretty Location where
+  pretty (Location x) = pretty $ Text.justifyRight 4 '0' $ Text.pack $ show x

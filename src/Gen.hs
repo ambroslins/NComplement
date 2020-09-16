@@ -1,5 +1,6 @@
 module Gen
   ( Gen,
+    Doc',
     Env (..),
     Symbol (..),
     Variable (..),
@@ -8,14 +9,13 @@ module Gen
     runGenerator,
     setSourceLine,
     throwE,
+    mapDoc,
     get,
     gets,
     modify,
     modifySymbols,
     emit,
-    emits,
     emitWithFuture,
-    emitsWithFuture,
     nextIndex,
     nextLocation,
   )
@@ -24,21 +24,25 @@ where
 import Control.Monad.Except
 import Control.Monad.Tardis
 import Control.Monad.Writer
+import Data.Bifunctor
 import Data.Map (Map)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
 import Located
-import qualified NC
+import Prettyprinter
+import Result
 import Syntax
 import Type (Type)
 
-type Gen = WriterT [Either Error NC.Statement] (ExceptT Error (Tardis Env Env))
+type Gen = WriterT (Result Error (Doc')) (ExceptT Error (Tardis Env Env))
+
+type Doc' = Doc ()
 
 data Symbol
   = Var Variable
   | Loc Location
-  | Fun ([Expr] -> Gen (Type, NC.Expr))
+  | Fun ([Expr] -> Gen (Type, Doc'))
 
 data Variable = Variable
   { typeof :: Type,
@@ -53,12 +57,14 @@ data Env = Env
     symbols :: Map Name Symbol
   }
 
-runGenerator :: Env -> Gen () -> Either Error [NC.Statement]
-runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT . revert
+runGenerator :: Env -> Gen () -> Either Error (Doc')
+runGenerator env =
+  join
+    . flip evalTardis (undefined, env)
+    . runExceptT
+    . (fmap toEither <$> execWriterT)
+    . revert
   where
-    foldEither [] = Right []
-    foldEither (Left x : _) = Left x
-    foldEither (Right x : xs) = (x :) <$> foldEither xs
     revert = (>> (lift $ lift $ getPast >>= sendPast))
 
 setSourceLine :: Pos -> Gen ()
@@ -68,8 +74,14 @@ throwE :: CompileError -> Gen a
 throwE err = do
   pos <- gets currentLine
   src <- gets source
-  let line = Text.lines src !! (unPos pos - 1)
-  throwError $ CompileError pos line err
+  let l = Text.lines src !! (unPos pos - 1)
+  throwError $ CompileError pos l err
+
+mapDoc :: (Doc' -> Doc') -> Gen a -> Gen a
+mapDoc f gen = do
+  (a, w) <- lift $ runWriterT gen
+  tell $ f <$> w
+  pure a
 
 get :: Gen Env
 get = gets id
@@ -83,22 +95,16 @@ modify = lift . lift . modifyForwards
 modifySymbols :: (Map Name Symbol -> Map Name Symbol) -> Gen ()
 modifySymbols f = modify $ \env -> env {symbols = f (symbols env)}
 
-emit :: NC.Statement -> Gen ()
-emit = tell . pure . pure
+emit :: Doc' -> Gen ()
+emit = tell . pure
 
-emits :: [NC.Statement] -> Gen ()
-emits = mapM_ emit
-
-emitWithFuture :: (Env -> Either CompileError NC.Statement) -> Gen ()
-emitWithFuture = emitsWithFuture . fmap pure
-
-emitsWithFuture :: (Env -> [Either CompileError NC.Statement]) -> Gen ()
-emitsWithFuture f = do
+emitWithFuture :: (Env -> Result CompileError (Doc')) -> Gen ()
+emitWithFuture f = do
   pos <- gets currentLine
   src <- gets source
   env <- lift $ lift $ getFuture
-  let line = Text.lines src !! (unPos pos -1)
-  tell $ map (either (Left . CompileError pos line) pure) $ f env
+  let l = Text.lines src !! (unPos pos - 1)
+  tell $ first (CompileError pos l) $ f env
 
 nextIndex :: Gen Index
 nextIndex = do

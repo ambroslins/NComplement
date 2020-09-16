@@ -5,6 +5,8 @@ module Result
   )
 where
 
+import Data.Bifunctor
+
 data Result a b = Err a | Ok b
   deriving (Eq, Ord, Show)
 
@@ -12,10 +14,18 @@ instance Functor (Result a) where
   fmap _ (Err x) = Err x
   fmap f (Ok x) = Ok (f x)
 
+instance Bifunctor Result where
+  bimap f _ (Err x) = Err (f x)
+  bimap _ f (Ok x) = Ok (f x)
+
 instance Semigroup b => Semigroup (Result a b) where
   Ok x <> Ok y = Ok (x <> y)
   Err x <> _ = Err x
   _ <> Err x = Err x
+
+instance Monoid b => Monoid (Result a b) where
+  mempty = Ok mempty
+  mappend = (<>)
 
 instance Applicative (Result a) where
   pure = Ok
