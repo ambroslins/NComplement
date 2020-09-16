@@ -22,6 +22,7 @@ data Expr
   | Sym Name
   | Ref Name
   | App Name [Expr]
+  | Ret Int
   | Neg Expr
   | Add Expr Expr
   | Sub Expr Expr

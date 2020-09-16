@@ -34,6 +34,7 @@ data Expr
   | Var Index
   | Ref Index
   | Loc Location
+  | Ret Int
   | String Text
   | Neg Expr
   | Add Expr Expr
@@ -131,6 +132,8 @@ instance ToText Expr where
     Var i -> "H" <> toText i
     Ref i -> toText i
     Loc l -> toText l
+    Ret 0 -> "HRET"
+    Ret x -> "H" <> brackets ("RET+" <> Text.pack (show x))
     String t -> t
     Neg x -> "-" <> brackets (toText x)
     Add x y -> binary "+" x y

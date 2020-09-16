@@ -53,6 +53,7 @@ term =
     [ parens expr,
       apply,
       reference,
+      Ret <$> (reserved "Ret" *> option 0 natural),
       symbol,
       Lit <$> literal
     ]

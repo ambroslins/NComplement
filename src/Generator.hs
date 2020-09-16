@@ -73,6 +73,7 @@ expr = \case
       Just (Fun f) -> f args
       Just _ -> throwE $ NotAFunction name
       Nothing -> throwE $ UndefinedSymbol name
+  Ret i -> pure (Type.Real, NC.Ret i)
   Neg x -> do
     (t, e) <- expr x
     case t of
