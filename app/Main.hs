@@ -5,6 +5,7 @@ import Data.Char (toUpper)
 import Error
 import NComplement
 import System.Environment
+import System.Exit
 import System.FilePath
 
 main :: IO ()
@@ -23,4 +24,4 @@ main =
       _ -> throwIO InvalidArguments
   where
     handler :: SomeException -> IO ()
-    handler e = print e
+    handler e = print e >> exitFailure
