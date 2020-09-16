@@ -29,12 +29,13 @@ defineArgs = mapM_ def
         then throwE $ AlreadyDefined name
         else do
           i <- nextIndex
-          let var = Variable {typeof = argType arg, index = i}
+          let t = either id (Lit.type' . snd) $ typeOrDefault arg
+          let var = Variable {typeof = t, index = i}
           modifySymbols $ Map.insert name (Var var)
           emit $
             NC.Definiton
               i
-              (argDefault arg)
+              (either (const Nothing) (Just) $ typeOrDefault arg)
               (fromMaybe (unName name) (description arg))
 
 defineVars :: Gen ()

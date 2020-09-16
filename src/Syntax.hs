@@ -8,8 +8,7 @@ import Located
 import Type (Type)
 
 data Argument = Argument
-  { argDefault :: Maybe (Sign, Literal),
-    argType :: Type,
+  { typeOrDefault :: Either Type (Sign, Literal),
     description :: Maybe Text
   }
 

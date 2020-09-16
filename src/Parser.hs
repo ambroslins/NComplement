@@ -14,7 +14,6 @@ import Control.Monad.Combinators.NonEmpty
     some,
   )
 import Data.Char (isUpper)
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import Lexer
 import Literal (Literal)
@@ -102,15 +101,15 @@ table =
 arg :: Parser (Name, Argument)
 arg = do
   n <- name
-  mtype <- optional $ colon >> parseType
-  def <- optional $ do
-    equal
-    sign <- option Plus (Minus <$ minus <|> Plus <$ plus)
-    lit <- literal
-    pure (sign, lit)
+  tOrD <-
+    option (Left Type.Real) $
+      Left <$> (colon *> parseType) <|> do
+        equal
+        sign <- option Plus (Minus <$ minus <|> Plus <$ plus)
+        lit <- literal
+        pure $ Right (sign, lit)
   desc <- optional (Text.pack <$> (char '(' >> manyTill charLiteral (char ')')))
-  let t = fromMaybe Type.Real $ mtype <|> Lit.type' . snd <$> def
-  pure $ (n, Argument {argType = t, argDefault = def, description = desc})
+  pure $ (n, Argument {typeOrDefault = tOrD, description = desc})
 
 parseType :: Parser Type
 parseType =
