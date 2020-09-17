@@ -36,7 +36,7 @@ generate input ast =
     env =
       Env
         { indices = Index <$> [100 .. 700],
-          locations = Location <$> [0, 10, 9000],
+          locations = Location <$> [0, 10 .. 9000],
           source = input,
           currentLine = pos1,
           symbols = mempty
