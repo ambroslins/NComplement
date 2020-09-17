@@ -16,6 +16,7 @@ import qualified Type
 
 program :: Program -> Gen ()
 program p = do
+  modifySymbols (flip Map.union (Fun <$> Map.fromList functions))
   defineArgs (arguments p)
   defineVars
   mapM_ statement (body p)

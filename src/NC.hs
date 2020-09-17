@@ -4,6 +4,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Literal (Literal)
 import qualified Literal as Lit
+import Numeric
 import Syntax
   ( Address (..),
     Index (..),
@@ -96,20 +97,20 @@ instance ToText Statement where
         f = maybe "" toText
     Call adr xs -> toText adr <> parens (Text.intercalate "," (map toText xs))
     Definiton i def desc ->
-      "H" <> (toText i) <> "   =  " <> val def
+      "H" <> (toText i) <> "   = " <> val def
         <> "   ( "
         <> Text.justifyLeft 44 ' ' (Text.toUpper desc)
         <> ")"
       where
         val = \case
           Just (s, Lit.Real x) ->
-            let (int, frac) = Text.breakOn "." (Text.pack $ show (abs x))
-             in sign s <> Text.justifyRight (6 - digit) '0' int
+            let (int, frac) = Text.breakOn "." (Text.pack $ showFFloatAlt Nothing (abs x) "")
+             in sign s <> Text.justifyRight (7 - digit) '0' int
                   <> Text.take
                     (4 + digit)
                     (Text.justifyLeft (4 + digit) '0' frac)
           Just (s, Lit.Int x) ->
-            sign s <> Text.replicate (6 - digit) "0" <> "."
+            sign s <> Text.replicate (7 - digit) "0" <> "."
               <> pad0 (3 + digit) (abs x)
           Just (_, Lit.Bool x) ->
             val $ Just (Plus, Lit.Int $ if x then 1 else 0)
@@ -131,7 +132,7 @@ instance ToText Expr where
   toText = \case
     Int x -> Text.pack $ show x
     Real x ->
-      let (int, frac) = Text.breakOn ". " $ Text.pack $ show x
+      let (int, frac) = Text.breakOn ". " $ Text.pack $ showFFloatAlt Nothing x ""
        in int <> Text.take 4 frac
     Var i -> "H" <> toText i
     Ref i -> toText i
