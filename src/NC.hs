@@ -81,7 +81,7 @@ printStmts = Text.unlines . map (<> ";") . map toText
 instance ToText Statement where
   toText = \case
     Codes cs -> Text.intercalate " " $ map toText cs
-    Assign (Index i) e -> "H" <> pad0 3 i <> " = " <> toText e
+    Assign i e -> "H" <> toText i <> " = " <> toText e
     IF (lhs, ord, rhs) (jT, jF) ->
       "IF " <> toText lhs <> s <> toText rhs
         <> "("
@@ -151,6 +151,7 @@ instance ToText Expr where
 
 instance ToText Index where
   toText (Index x) = pad0 3 x
+  toText Return = "RET"
 
 instance ToText Location where
   toText (Location x) = pad0 4 x

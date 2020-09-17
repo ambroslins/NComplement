@@ -4,6 +4,7 @@ import Control.Monad (forM, when)
 import Data.Foldable (toList)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import Error
 import Gen
@@ -11,8 +12,22 @@ import qualified Literal as Lit
 import Located
 import qualified NC
 import Syntax
+import Text.Megaparsec (pos1)
 import Type (Type)
 import qualified Type
+
+startEnv :: Text -> Env
+startEnv input =
+  Env
+    { indices = Index <$> [100 .. 900],
+      locations = Location <$> [0, 10 .. 9000],
+      source = input,
+      currentLine = pos1,
+      symbols =
+        Map.fromList $
+          ("ret", Var Variable {typeof = Type.Real, index = Return}) :
+          (fmap Fun <$> functions)
+    }
 
 program :: Program -> Gen ()
 program p = do
@@ -74,7 +89,6 @@ expr = \case
       Just (Fun f) -> f args
       Just _ -> throwE $ NotAFunction name
       Nothing -> throwE $ UndefinedSymbol name
-  Ret i -> pure (Type.Real, NC.Ret i)
   Neg x -> do
     (t, e) <- expr x
     case t of

@@ -53,7 +53,6 @@ term =
     [ parens expr,
       apply,
       reference,
-      Ret <$> (reserved "Ret" *> option 0 natural),
       symbol,
       Lit <$> literal
     ]
@@ -67,7 +66,7 @@ literal =
       Lit.Bool False <$ reserved "False",
       Lit.Real <$> try real,
       Lit.Int <$> natural,
-      Lit.String . Text.pack <$> (char '"' *> manyTill charLiteral (char '"'))
+      Lit.String  <$> stringLiteral
     ]
 
 name :: Parser Name

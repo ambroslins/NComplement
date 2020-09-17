@@ -10,7 +10,7 @@ import qualified NC
 import qualified Parser
 import Syntax (Program)
 import System.FilePath
-import Text.Megaparsec (parse, pos1)
+import Text.Megaparsec (parse)
 
 runCompiler :: FilePath -> FilePath -> IO ()
 runCompiler inFilePath outFilePath = do
@@ -31,13 +31,4 @@ compile inFilePath input =
 generate :: Text -> Program -> Either Error Text
 generate input ast =
   NC.printStmts
-    <$> runGenerator env (Generator.program ast)
-  where
-    env =
-      Env
-        { indices = Index <$> [100 .. 700],
-          locations = Location <$> [0, 10 .. 9000],
-          source = input,
-          currentLine = pos1,
-          symbols = mempty
-        }
+    <$> runGenerator (Generator.startEnv input) (Generator.program ast)

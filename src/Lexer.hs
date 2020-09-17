@@ -10,6 +10,7 @@ module Lexer
     natural,
     integer,
     real,
+    stringLiteral,
     parens,
     braces,
     semicolon,
@@ -82,6 +83,9 @@ natural = lexeme Lex.decimal
 
 integer :: (Integral a, Num a) => Parser a
 integer = lexeme $ Lex.signed sc natural
+
+stringLiteral :: Parser Text
+stringLiteral = between (char '"') (char '"') $ takeWhileP Nothing (/= '"')
 
 real :: Parser Double
 real = lexeme $ Lex.float

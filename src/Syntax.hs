@@ -22,7 +22,6 @@ data Expr
   | Sym Name
   | Ref Name
   | App Name [Expr]
-  | Ret Int
   | Neg Expr
   | Add Expr Expr
   | Sub Expr Expr
@@ -65,7 +64,7 @@ newtype Address = Address Text
 instance IsString Address where
   fromString s = Address $ fromString s
 
-newtype Index = Index Int
+data Index = Index Int | Return 
   deriving (Eq, Ord, Show)
 
 newtype Location = Location Int
