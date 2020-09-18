@@ -31,7 +31,6 @@ startEnv input =
 
 program :: Program -> Gen ()
 program p = do
-  modifySymbols (flip Map.union (Fun <$> Map.fromList functions))
   defineArgs (arguments p)
   defineVars
   mapM_ statement (body p)
@@ -142,7 +141,22 @@ functions =
     included "acos" NC.ACOS,
     included "atan" NC.ATAN,
     included "sqrt" NC.SQRT,
-    included "round" NC.ROUND,
+    lambda "round" Type.Real $
+      \x -> (Type.Int, NC.Div (NC.App NC.ROUND x) (NC.Real 1.0)),
+    lambda "floor" Type.Real $
+      \x ->
+        ( Type.Int,
+          NC.Div
+            (NC.App NC.ROUND (NC.Sub x (NC.Real 0.5)))
+            (NC.Real 1.0)
+        ),
+    lambda "ceil" Type.Real $
+      \x ->
+        ( Type.Int,
+          NC.Div
+            (NC.App NC.ROUND (NC.Add x (NC.Sub (NC.Real 0.5) (NC.Int 1))))
+            (NC.Real 1.0)
+        ),
     ( "norm",
       \args -> case map (Pow 2) args of
         [] -> throwE $ TypeMismatchApp "norm" [Type.Real, Type.Real] []
@@ -150,16 +164,14 @@ functions =
     )
   ]
   where
-    included name f =
+    lambda name t f =
       ( name,
-        \args -> do
-          xs <- mapM expr args
-          case xs of
-            [(t, x)] -> case t of
-              Type.Real -> pure $ (Type.Real, NC.App f x)
-              _ -> throwE $ TypeMismatchApp name [Type.Real] [t]
-            xs' -> throwE $ TypeMismatchApp name [Type.Real] (map fst xs')
+        \args ->
+          mapM expr args >>= \case
+            [(t', x)] | t == t' -> pure $ f x
+            xs -> throwE $ TypeMismatchApp name [t] (map fst xs)
       )
+    included name f = lambda name Type.Real $ \x -> (Type.Real, NC.App f x)
 
 statement :: Statement -> Gen ()
 statement (At pos stmt) = do

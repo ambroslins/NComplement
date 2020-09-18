@@ -54,7 +54,13 @@ data Env = Env
   }
 
 runGenerator :: Env -> Gen () -> Either Error [NC.Statement]
-runGenerator env = join . fmap foldEither . flip evalTardis (undefined, env) . runExceptT . execWriterT . revert
+runGenerator env =
+  join
+    . fmap foldEither
+    . flip evalTardis (undefined, env)
+    . runExceptT
+    . execWriterT
+    . revert
   where
     foldEither [] = Right []
     foldEither (Left x : _) = Left x
@@ -101,18 +107,16 @@ emitsWithFuture f = do
   tell $ map (either (Left . CompileError pos line) pure) $ f env
 
 nextIndex :: Gen Index
-nextIndex = do
-  is <- gets indices
-  case is of
+nextIndex =
+  gets indices >>= \case
     [] -> throwE OutOfIndices
     i : is' -> do
       modify $ \env -> env {indices = is'}
       pure i
 
 nextLocation :: Gen Location
-nextLocation = do
-  ls <- gets locations
-  case ls of
+nextLocation =
+  gets locations >>= \case
     [] -> throwE OutOfLocations
     l : ls' -> do
       modify $ \env -> env {locations = ls'}
