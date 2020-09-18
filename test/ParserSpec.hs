@@ -16,26 +16,27 @@ spec = do
     let x `shouldParseTo` expr =
           parse Parser.expr "" (Text.pack x) `shouldParse` expr
     it "should parse simple expressions" $ do
-      "1+1" `shouldParseTo` (let x = Lit (Lit.Int 1) in Add x x)
-      "1.0-1.0" `shouldParseTo` (let x = Lit (Lit.Real 1.0) in Sub x x)
-      "1*1" `shouldParseTo` (let x = Lit (Lit.Int 1) in Mul x x)
-      "1.0/1.0" `shouldParseTo` (let x = Lit (Lit.Real 1.0) in Div x x)
+      "1+1" `shouldParseTo` (let x = Lit (Lit.Int 1) in BinOp Add x x)
+      "1.0-1.0" `shouldParseTo` (let x = Lit (Lit.Real 1.0) in BinOp Sub x x)
+      "1*1" `shouldParseTo` (let x = Lit (Lit.Int 1) in BinOp Mul x x)
+      "1.0/1.0" `shouldParseTo` (let x = Lit (Lit.Real 1.0) in BinOp Div x x)
       "-1" `shouldParseTo` (Neg (Lit (Lit.Int 1)))
       "-1.0" `shouldParseTo` (Neg (Lit (Lit.Real 1.0)))
-      "2+2*2" `shouldParseTo` (let x = Lit (Lit.Int 2) in Add x (Mul x x))
-      "(2+2)*2" `shouldParseTo` (let x = Lit (Lit.Int 2) in Mul (Add x x) x)
-      "2-2/2" `shouldParseTo` (let x = Lit (Lit.Int 2) in Sub x (Div x x))
-      "(2-2)/2" `shouldParseTo` (let x = Lit (Lit.Int 2) in Div (Sub x x) x)
-      "(2-2)*(2+2)" `shouldParseTo` (let x = Lit (Lit.Int 2) in Mul (Sub x x) (Add x x))
+      "2+2*2" `shouldParseTo` (let x = Lit (Lit.Int 2) in BinOp Add x (BinOp Mul x x))
+      "(2+2)*2" `shouldParseTo` (let x = Lit (Lit.Int 2) in BinOp Mul (BinOp Add x x) x)
+      "2-2/2" `shouldParseTo` (let x = Lit (Lit.Int 2) in BinOp Sub x (BinOp Div x x))
+      "(2-2)/2" `shouldParseTo` (let x = Lit (Lit.Int 2) in BinOp Div (BinOp Sub x x) x)
+      "(2-2)*(2+2)" `shouldParseTo` (let x = Lit (Lit.Int 2) in BinOp Mul (BinOp Sub x x) (BinOp Add x x))
       "2^3" `shouldParseTo` (Pow 3 (Lit (Lit.Int 2)))
     it "should parse function application" $ do
       "sin(90.0)" `shouldParseTo` (App "sin" [Lit (Lit.Real 90.0)])
       "f(1, 2.0/2)*2"
-        `shouldParseTo` ( Mul
+        `shouldParseTo` ( BinOp
+                            Mul
                             ( App
                                 "f"
                                 [ Lit (Lit.Int 1),
-                                  Div (Lit (Lit.Real 2.0)) (Lit (Lit.Int 2))
+                                  BinOp Div (Lit (Lit.Real 2.0)) (Lit (Lit.Int 2))
                                 ]
                             )
                             (Lit (Lit.Int 2))

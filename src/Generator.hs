@@ -94,43 +94,46 @@ expr = \case
       Type.Int -> pure (Type.Int, NC.Neg e)
       Type.Real -> pure (Type.Real, NC.Neg e)
       _ -> throwE $ TypeMismatchNeg t
-  Add x y -> additive NC.Add x y TypeMismatchAdd
-  Sub x y -> additive NC.Sub x y TypeMismatchSub
-  Mul x y -> do
-    (tx, ex) <- expr x
-    (ty, ey) <- expr y
-    case (tx, ty) of
-      (Type.Int, Type.Int) -> pure (Type.Int, NC.Mul ex ey)
-      (Type.Int, Type.Real) -> pure (Type.Real, NC.Mul ex ey)
-      (Type.Real, Type.Int) -> pure (Type.Real, NC.Mul ex ey)
-      (Type.Real, Type.Real) -> pure (Type.Real, NC.Div (NC.Mul ex ey) (NC.Real 1.0))
-      _ -> throwE $ TypeMismatchMul tx ty
-  Div x y -> do
-    (tx, ex) <- expr x
-    (ty, ey) <- expr y
-    case (tx, ty) of
-      (Type.Int, Type.Int) -> pure (Type.Int, NC.Div ex ey)
-      (Type.Real, Type.Int) -> pure (Type.Real, NC.Div ex ey)
-      (Type.Real, Type.Real) -> pure (Type.Real, NC.Mul (NC.Div ex ey) (NC.Real 1.0))
-      _ -> throwE $ TypeMismatchDiv tx ty
+  BinOp op x y -> do
+    (tx, x') <- expr x
+    (ty, y') <- expr y
+    case op of
+      Add ->
+        let z = NC.Add x' y'
+         in case (tx, ty) of
+              (Type.Int, Type.Int) -> pure (Type.Int, z)
+              (Type.Real, Type.Real) -> pure (Type.Real, z)
+              _ -> throwE $ TypeMismatchAdd tx ty
+      Sub ->
+        let z = NC.Sub x' y'
+         in case (tx, ty) of
+              (Type.Int, Type.Int) -> pure (Type.Int, z)
+              (Type.Real, Type.Real) -> pure (Type.Real, z)
+              _ -> throwE $ TypeMismatchAdd tx ty
+      Mul ->
+        let z = NC.Mul x' y'
+         in case (tx, ty) of
+              (Type.Int, Type.Int) -> pure (Type.Int, z)
+              (Type.Int, Type.Real) -> pure (Type.Real, z)
+              (Type.Real, Type.Int) -> pure (Type.Real, z)
+              (Type.Real, Type.Real) -> pure (Type.Real, NC.Div z (NC.Real 1.0))
+              _ -> throwE $ TypeMismatchMul tx ty
+      Div ->
+        let z = NC.Div x' y'
+         in case (tx, ty) of
+              (Type.Int, Type.Int) -> pure (Type.Int, z)
+              (Type.Real, Type.Int) -> pure (Type.Real, z)
+              (Type.Real, Type.Real) -> pure (Type.Real, NC.Mul z (NC.Real 1.0))
+              _ -> throwE $ TypeMismatchDiv tx ty
   Pow n x ->
     expr $
       ( if n < 0
-          then Div (Lit $ Lit.Real 1.0)
+          then BinOp Div (Lit $ Lit.Real 1.0)
           else id
       )
         $ case replicate (abs n) x of
           [] -> Lit $ Lit.Int 1
-          x' : xs -> foldr Mul x' xs
-  where
-    additive f x y e = do
-      (tx, ex) <- expr x
-      (ty, ey) <- expr y
-      t <- case (tx, ty) of
-        (Type.Int, Type.Int) -> pure Type.Int
-        (Type.Real, Type.Real) -> pure Type.Real
-        _ -> throwE $ e tx ty
-      pure (t, f ex ey)
+          x' : xs -> foldr (BinOp Mul) x' xs
 
 functions :: [(Name, [Expr] -> Gen (Type, NC.Expr))]
 functions =
@@ -160,7 +163,7 @@ functions =
     ( "norm",
       \args -> case map (Pow 2) args of
         [] -> throwE $ TypeMismatchApp "norm" [Type.Real, Type.Real] []
-        x : xs -> expr $ App "sqrt" $ [foldl Add x xs]
+        x : xs -> expr $ App "sqrt" $ [foldl (BinOp Add) x xs]
     )
   ]
   where

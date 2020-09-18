@@ -23,11 +23,15 @@ data Expr
   | Ref Name
   | App Name [Expr]
   | Neg Expr
-  | Add Expr Expr
-  | Sub Expr Expr
-  | Mul Expr Expr
-  | Div Expr Expr
+  | BinOp BinOp Expr Expr
   | Pow Int Expr
+  deriving (Eq, Show)
+
+data BinOp
+  = Add
+  | Sub
+  | Mul
+  | Div
   deriving (Eq, Show)
 
 data Sign

@@ -66,7 +66,7 @@ literal =
       Lit.Bool False <$ reserved "False",
       Lit.Real <$> try real,
       Lit.Int <$> natural,
-      Lit.String  <$> stringLiteral
+      Lit.String <$> stringLiteral
     ]
 
 name :: Parser Name
@@ -94,7 +94,7 @@ table =
   ]
   where
     prefix p f = Prefix (f <$ p)
-    infixLeft p f = InfixL (f <$ p)
+    infixLeft p f = InfixL (BinOp f <$ p)
 
 -- Arguments
 
