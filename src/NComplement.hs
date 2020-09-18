@@ -30,5 +30,5 @@ compile inFilePath input =
 
 generate :: Text -> Program -> Either Error Text
 generate input ast =
-  NC.printStmts
+  NC.render
     <$> runGenerator (Generator.startEnv input) (Generator.program ast)

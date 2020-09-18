@@ -25,7 +25,7 @@ instance Arbitrary Sign where
 spec :: Spec
 spec = do
   describe "definition" $ do
-    it "should always be 71 chars long" $ do
+    it "should always be 72 chars long" $ do
       property $ \i def desc ->
         (length desc < 43)
-          ==> Text.length (toText (Definiton i def (Text.pack desc))) === 71
+          ==> Text.length (render $ pure $ Definiton i def (Text.pack desc)) === 72

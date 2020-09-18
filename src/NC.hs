@@ -5,6 +5,8 @@ import qualified Data.Text as Text
 import Literal (Literal)
 import qualified Literal as Lit
 import Numeric
+import Prettyprinter
+import Prettyprinter.Render.Text
 import Syntax
   ( Address (..),
     Index (..),
@@ -35,7 +37,6 @@ data Expr
   | Var Index
   | Ref Index
   | Loc Location
-  | Ret Int
   | String Text
   | Neg Expr
   | Add Expr Expr
@@ -64,7 +65,7 @@ fromLit = \case
   Lit.String x -> String x
 
 g :: Int -> Code
-g = Code "G" . (String . pad0 2)
+g = Code "G" . Int
 
 n :: Location -> Code
 n = Code "N" . Loc
@@ -72,98 +73,91 @@ n = Code "N" . Loc
 jump :: Location -> Code
 jump = Code "JUMP" . Loc
 
-class ToText a where
-  toText :: a -> Text
+render :: [Statement] -> Text
+render =
+  renderStrict
+    . layoutPretty options
+    . vsep
+    . map (<> ";")
+    . map pretty
+  where
+    options = LayoutOptions Unbounded
 
-printStmts :: [Statement] -> Text
-printStmts = Text.unlines . map (<> ";") . map toText
-
-instance ToText Statement where
-  toText = \case
-    Codes cs -> Text.intercalate " " $ map toText cs
-    Assign i e -> "H" <> toText i <> " = " <> toText e
+instance Pretty Statement where
+  pretty = \case
+    Codes cs -> hsep $ map pretty cs
+    Assign i x -> "H" <> prettyIndex i <+> "=" <+> pretty x
     IF (lhs, ord, rhs) (jT, jF) ->
-      "IF " <> toText lhs <> s <> toText rhs
-        <> "("
-        <> f jT
-        <> ","
-        <> f jF
-        <> ")"
+      "IF" <+> pretty lhs <> s <> pretty rhs
+        <+> tupled (maybe "" prettyLocation <$> [jT, jF])
       where
         s = case ord of
           EQ -> "="
           LT -> "<"
           GT -> ">"
-        f = maybe "" toText
-    Call adr xs -> toText adr <> parens (Text.intercalate "," (map toText xs))
+    Call adr xs -> prettyAddress adr <> tupled (map pretty xs)
     Definiton i def desc ->
-      "H" <> (toText i) <> "   = " <> val def
-        <> "   ( "
-        <> Text.justifyLeft 44 ' ' (Text.toUpper desc)
-        <> ")"
+      "H" <> prettyIndex i <> "   = " <> val def
+        <> "   "
+        <> parens
+          (column $ \c -> pretty $ Text.justifyLeft (70 - c) ' ' (Text.toUpper desc))
       where
         val = \case
           Just (s, Lit.Real x) ->
             let (int, frac) = Text.breakOn "." (Text.pack $ showFFloatAlt Nothing (abs x) "")
-             in sign s <> Text.justifyRight (7 - digit) '0' int
-                  <> Text.take
-                    (4 + digit)
-                    (Text.justifyLeft (4 + digit) '0' frac)
+             in pretty $
+                  sign s <> Text.justifyRight (7 - digit) '0' int
+                    <> Text.take
+                      (4 + digit)
+                      (Text.justifyLeft (4 + digit) '0' frac)
           Just (s, Lit.Int x) ->
-            sign s <> Text.replicate (7 - digit) "0" <> "."
+            (pretty $ sign s <> Text.replicate (7 - digit) "0" <> ".")
               <> pad0 (3 + digit) (abs x)
           Just (_, Lit.Bool x) ->
             val $ Just (Plus, Lit.Int $ if x then 1 else 0)
           _ -> val $ Just (Plus, Lit.Int 0)
         sign Minus = "-"
         sign Plus = "+"
-    Escape x -> x
+    Escape x -> pretty x
 
-instance ToText Code where
-  toText = \case
+instance Pretty Code where
+  pretty = \case
     Code "G" (Int x) -> "G" <> pad0 2 x
     Code "M" (Int x) -> "M" <> pad0 2 x
     Code "T" (Int x) -> "T" <> pad0 3 x
     Code "C" (Int x) -> "C" <> pad0 3 x
-    Code adr x -> toText adr <> toText x
-    Comment x -> parens (Text.toUpper x)
+    Code adr x -> prettyAddress adr <> pretty x
+    Comment x -> parens $ pretty (Text.toUpper x)
 
-instance ToText Expr where
-  toText = \case
-    Int x -> Text.pack $ show x
+instance Pretty Expr where
+  pretty = \case
+    Int x -> viaShow x
     Real x ->
       let (int, frac) = Text.breakOn ". " $ Text.pack $ showFFloatAlt Nothing x ""
-       in int <> Text.take 4 frac
-    Var i -> "H" <> toText i
-    Ref i -> toText i
-    Loc l -> toText l
-    Ret 0 -> "HRET"
-    Ret x -> "H" <> brackets ("RET+" <> Text.pack (show x))
-    String t -> t
-    Neg x -> "-" <> brackets (toText x)
+       in pretty $ int <> Text.take 4 frac
+    Var i -> "H" <> prettyIndex i
+    Ref i -> prettyIndex i
+    Loc l -> prettyLocation l
+    String t -> pretty t
+    Neg x -> "-" <> brackets (pretty x)
     Add x y -> binary "+" x y
     Sub x y -> binary "-" x y
     Mul x y -> binary "*" x y
     Div x y -> binary "/" x y
-    App f x -> Text.pack (show f) <> brackets (toText x)
+    App f x -> viaShow f <> brackets (pretty x)
     where
-      binary s x y = brackets $ toText x <> s <> toText y
+      binary s x y = brackets $ pretty x <> s <> pretty y
 
-instance ToText Index where
-  toText (Index x) = pad0 3 x
-  toText Return = "RET"
+prettyIndex :: Index -> Doc ann
+prettyIndex = \case
+  Index x -> pad0 3 x
+  Return -> "RET"
 
-instance ToText Location where
-  toText (Location x) = pad0 4 x
+prettyLocation :: Location -> Doc ann
+prettyLocation (Location x) = pad0 4 x
 
-instance ToText Address where
-  toText (Address x) = x
+prettyAddress :: Address -> Doc ann
+prettyAddress (Address x) = pretty x
 
-parens :: Text -> Text
-parens x = "(" <> x <> ")"
-
-brackets :: Text -> Text
-brackets x = "[" <> x <> "]"
-
-pad0 :: Show a => Int -> a -> Text
-pad0 x = Text.justifyRight x '0' . Text.pack . show
+pad0 :: Show a => Int -> a -> Doc ann
+pad0 x = pretty . Text.justifyRight x '0' . Text.pack . show

@@ -64,7 +64,7 @@ newtype Address = Address Text
 instance IsString Address where
   fromString s = Address $ fromString s
 
-data Index = Index Int | Return 
+data Index = Index Int | Return
   deriving (Eq, Ord, Show)
 
 newtype Location = Location Int

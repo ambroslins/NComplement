@@ -18,6 +18,13 @@ packages:
       sha256: 55cfefc7cab71d84528ddc846040c60a27e827e806d39aeba8ca5a2bf0a5e96c
   original:
     hackage: hspec-megaparsec-2.2.0
+- completed:
+    hackage: prettyprinter-1.7.0@sha256:6a9569e21fa61163a7f066d23d701e23e917893e8f39733d6e617ec72787ae5f,6007
+    pantry-tree:
+      size: 3194
+      sha256: d22f820a1f63497f7fd7e1f04b7d356d92de35582258f6ad55428c88b09e63ff
+  original:
+    hackage: prettyprinter-1.7.0
 snapshots:
 - completed:
     size: 532382

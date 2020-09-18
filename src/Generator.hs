@@ -185,7 +185,7 @@ statement (At pos stmt) = do
           emit $ NC.Codes [NC.n l2]
     Scope stmts -> mapM_ statement stmts
     Unsafe x -> do
-      xs <- mapM (either pure (fmap (NC.toText . snd) . expr)) x
+      xs <- mapM (either pure (fmap (Text.pack . show . snd) . expr)) x
       emit $ NC.Escape $ Text.concat xs
     Label name -> do
       syms <- gets symbols

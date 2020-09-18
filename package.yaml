@@ -29,6 +29,7 @@ dependencies:
 - containers
 - text
 - filepath
+- prettyprinter
 
 default-extensions:
   - LambdaCase
