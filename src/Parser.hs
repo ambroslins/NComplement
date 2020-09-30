@@ -29,10 +29,7 @@ import Text.Megaparsec
     try,
     (<?>),
   )
-import Text.Megaparsec.Char
-  ( char,
-    eol,
-  )
+import Text.Megaparsec.Char (char)
 import Type (Type)
 import qualified Type
 
@@ -44,8 +41,7 @@ program = Program <$> option [] args <*> statements <* (scn >> eof)
 -- Expression
 
 expr :: Parser Expr
-expr =
-  makeExprParser term table <?> "expression"
+expr = makeExprParser term table <?> "expression"
 
 term :: Parser Expr
 term =
@@ -99,7 +95,7 @@ table =
 -- Arguments
 
 arg :: Parser (Name, Argument)
-arg = do
+arg = lexeme' $ do
   n <- name
   tOrD <-
     option (Left Type.Real) $
@@ -120,12 +116,9 @@ parseType =
     ]
 
 args :: Parser [(Name, Argument)]
-args =
-  lexeme' $
-    reserved "Args"
-      >> parens (sepBy arg sep)
+args = lexeme' $ parens (sepBy arg sep)
   where
-    sep = comma >> many (lexeme eol)
+    sep = lexeme' comma
 
 -- Statement
 
