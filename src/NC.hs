@@ -24,6 +24,7 @@ data Statement
   | Call Address [Expr]
   | Definiton Index (Maybe (Sign, Literal)) Text
   | Escape Text
+  | EmptyLine
   deriving (Eq, Show)
 
 data Code
@@ -119,6 +120,7 @@ instance Pretty Statement where
         sign Minus = "-"
         sign Plus = "+"
     Escape x -> pretty x
+    EmptyLine -> mempty
 
 instance Pretty Code where
   pretty = \case

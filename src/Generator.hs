@@ -32,7 +32,9 @@ startEnv input =
 program :: Program -> Gen ()
 program p = do
   defineArgs (arguments p)
+  emit NC.EmptyLine
   defineVars
+  emit NC.EmptyLine
   mapM_ statement (body p)
 
 defineArgs :: [(Name, Argument)] -> Gen ()
@@ -269,6 +271,7 @@ statement' = \case
             ("U", Type.Real),
             ("V", Type.Real)
           ]
+  EmptyLine -> emit NC.EmptyLine
   where
     defineVar name t = do
       syms <- gets symbols

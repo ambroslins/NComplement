@@ -51,6 +51,7 @@ data Statement'
   | Codes (NonEmpty Code)
   | If (Expr, Ordering, Expr) Statement (Maybe Statement)
   | Label Name
+  | EmptyLine
   deriving (Eq, Show)
 
 data Code = Code Address Expr
