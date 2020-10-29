@@ -135,7 +135,7 @@ instance Pretty Expr where
   pretty = \case
     Int x -> viaShow x
     Real x ->
-      let (int, frac) = Text.breakOn ". " $ Text.pack $ showFFloatAlt Nothing x ""
+      let (int, frac) = Text.breakOn "." $ Text.pack $ showFFloatAlt Nothing x ""
        in pretty $ int <> Text.take 4 frac
     Var i -> "H" <> prettyIndex i
     Ref i -> prettyIndex i
