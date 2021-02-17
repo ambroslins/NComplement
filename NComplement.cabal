@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 38b9dbdb5883504a1b8075f87a58bb6358cfafda8124ec61f167ef33acc6cc6b
+-- hash: 2b452f4ea12f8fb4ea3b1c659df99bfeb8f7e9a2243587f993ef82ec8f603540
 
 name:           NComplement
 version:        0.1.0.0
@@ -48,7 +48,7 @@ library
       base >=4.7 && <5
     , containers
     , filepath
-    , megaparsec >=9.0.0
+    , megaparsec
     , mtl
     , parser-combinators
     , prettyprinter
@@ -70,7 +70,7 @@ executable NComplement
     , base >=4.7 && <5
     , containers
     , filepath
-    , megaparsec >=9.0.0
+    , megaparsec
     , mtl
     , parser-combinators
     , prettyprinter
@@ -97,8 +97,8 @@ test-suite NComplement-test
     , containers
     , filepath
     , hspec
-    , hspec-megaparsec >=2.2.0
-    , megaparsec >=9.0.0
+    , hspec-megaparsec
+    , megaparsec
     , mtl
     , parser-combinators
     , prettyprinter

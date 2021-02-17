@@ -3,31 +3,10 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages:
-- completed:
-    hackage: megaparsec-9.0.0@sha256:920d1e469056c746b532333a078c2a9a195fab5e860e0c9734ee92a28c2bfb65,3117
-    pantry-tree:
-      size: 1447
-      sha256: 26c1c24e343cfa6b2c55715fff4b8608e527a6b6ad3d510e328e0a228f979a7d
-  original:
-    hackage: megaparsec-9.0.0
-- completed:
-    hackage: hspec-megaparsec-2.2.0@sha256:679b9b91ea0ed0c36d6782d6051a08e0825409d10adbab8c8cfa9c8bd8bfc245,1802
-    pantry-tree:
-      size: 385
-      sha256: 55cfefc7cab71d84528ddc846040c60a27e827e806d39aeba8ca5a2bf0a5e96c
-  original:
-    hackage: hspec-megaparsec-2.2.0
-- completed:
-    hackage: prettyprinter-1.7.0@sha256:6a9569e21fa61163a7f066d23d701e23e917893e8f39733d6e617ec72787ae5f,6007
-    pantry-tree:
-      size: 3194
-      sha256: d22f820a1f63497f7fd7e1f04b7d356d92de35582258f6ad55428c88b09e63ff
-  original:
-    hackage: prettyprinter-1.7.0
+packages: []
 snapshots:
 - completed:
-    size: 532382
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/14.yaml
-    sha256: 1ef27e36f38824abafc43224ca612211b3828fa9ffd31ba0fc2867ae2e19ba90
-  original: lts-16.14
+    size: 563103
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/17/4.yaml
+    sha256: f11e2153044f5f71ea7b1c9398f4721f517c9bd37642ed769647b896564021f3
+  original: lts-17.4

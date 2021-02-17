@@ -21,7 +21,7 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
-- megaparsec >= 9.0.0
+- megaparsec
 - parser-combinators
 - replace-megaparsec
 - mtl
@@ -65,5 +65,5 @@ tests:
     dependencies:
     - NComplement
     - hspec
-    - hspec-megaparsec >= 2.2.0
+    - hspec-megaparsec
     - QuickCheck
