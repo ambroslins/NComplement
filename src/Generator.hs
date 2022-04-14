@@ -11,6 +11,7 @@ import Gen
 import qualified Literal as Lit
 import Located
 import qualified NC
+import NaturalSort
 import Syntax
 import Text.Megaparsec (pos1)
 import Type (Type)
@@ -64,7 +65,8 @@ defineVars = do
           (n, Var var) -> Just $ pure $ def n var
           _ -> Nothing
       )
-      (Map.toList (Map.difference (symbols env) prev))
+      $ naturalSortOn (Text.unpack . unName . fst) $
+        Map.toList (Map.difference (symbols env) prev)
   where
     def name var = NC.Definiton (index var) Nothing (unName name)
 
